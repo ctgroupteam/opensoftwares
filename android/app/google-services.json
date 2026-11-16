@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "594581839921",
+    "project_id": "schoolsystem-opensoftwares",
+    "storage_bucket": "schoolsystem-opensoftwares.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:594581839921:android:04bd6d19d7d23cf9a8f510",
+        "android_client_info": {
+          "package_name": "com.opensoftwares.crm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBJMtmU3uxMf9gwieSWx1IjZJYYSNnXr0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
