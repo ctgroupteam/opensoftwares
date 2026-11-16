@@ -77,7 +77,7 @@ class _OpenSoftwaresCrmAppState extends ConsumerState<OpenSoftwaresCrmApp> {
     Future.delayed(const Duration(seconds: 4), () {
       if (!mounted) return;
       final ctx = _navigatorKey.currentContext;
-      if (ctx != null) {
+      if (ctx != null && ctx.mounted) {
         UpdateService.instance.checkForUpdates(ctx, silent: true);
       }
     });

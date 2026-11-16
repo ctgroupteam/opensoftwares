@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../core/svg_icons.dart';
@@ -217,9 +216,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const Divider(height: 20, color: AppConstants.borderSubtle),
 
-                  // 2. Notification Diagnostic Testers
+                  // 2. Five Custom Sound Testers (Heads-Up Screen Popups)
                   const Text(
-                    'Test Notifications On Device',
+                    'Test Notification Sounds On Device (5 Tones)',
                     style: TextStyle(
                       color: AppConstants.textBlack,
                       fontSize: 12,
@@ -227,42 +226,74 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.notifications_active_outlined, size: 16, color: AppConstants.statusDanger),
-                          label: const Text('Test Alarm', style: TextStyle(fontSize: 11, color: AppConstants.darkBlue)),
-                          onPressed: () async {
-                            final messenger = ScaffoldMessenger.of(context);
-                            await NotificationService.instance.sendTestNotification(isAlarm: true);
-                            if (!mounted) return;
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('Insistent alarm notification triggered!'),
-                                backgroundColor: AppConstants.statusSuccess,
-                              ),
-                            );
-                          },
-                        ),
+                      ActionChip(
+                        avatar: const Icon(Icons.warning_amber_rounded, size: 16, color: AppConstants.statusDanger),
+                        label: const Text('Alarm Tone', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        backgroundColor: AppConstants.backgroundLight,
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          await NotificationService.instance.sendTestNotification('alarm');
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('Alarm Siren notification popped up on screen!'), backgroundColor: AppConstants.statusSuccess),
+                          );
+                        },
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.notifications_outlined, size: 16, color: AppConstants.skyBlue),
-                          label: const Text('Test Normal', style: TextStyle(fontSize: 11, color: AppConstants.darkBlue)),
-                          onPressed: () async {
-                            final messenger = ScaffoldMessenger.of(context);
-                            await NotificationService.instance.sendTestNotification(isAlarm: false);
-                            if (!mounted) return;
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('Standard notification triggered!'),
-                                backgroundColor: AppConstants.statusSuccess,
-                              ),
-                            );
-                          },
-                        ),
+                      ActionChip(
+                        avatar: const Icon(Icons.notifications_active_outlined, size: 16, color: AppConstants.skyBlue),
+                        label: const Text('Reminder Chime', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        backgroundColor: AppConstants.backgroundLight,
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          await NotificationService.instance.sendTestNotification('reminder');
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('Reminder Chime notification popped up on screen!'), backgroundColor: AppConstants.statusSuccess),
+                          );
+                        },
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.calendar_month_outlined, size: 16, color: AppConstants.accentCyan),
+                        label: const Text('Meeting Bell', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        backgroundColor: AppConstants.backgroundLight,
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          await NotificationService.instance.sendTestNotification('meeting');
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('Meeting Triad Bell notification popped up on screen!'), backgroundColor: AppConstants.statusSuccess),
+                          );
+                        },
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.check_circle_outline, size: 16, color: AppConstants.statusSuccess),
+                        label: const Text('Task Pop', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        backgroundColor: AppConstants.backgroundLight,
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          await NotificationService.instance.sendTestNotification('task');
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('Task Pop notification popped up on screen!'), backgroundColor: AppConstants.statusSuccess),
+                          );
+                        },
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.campaign_outlined, size: 16, color: AppConstants.statusWarning),
+                        label: const Text('Notice Harmonics', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        backgroundColor: AppConstants.backgroundLight,
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          await NotificationService.instance.sendTestNotification('notice');
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('Notice Crystal Chime notification popped up on screen!'), backgroundColor: AppConstants.statusSuccess),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -303,35 +334,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const Divider(height: 14, color: AppConstants.borderSubtle),
 
-                  // 4. Copy FCM Device Token
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.vpn_key_outlined, size: 20, color: AppConstants.darkBlue),
-                    title: const Text(
-                      'Device FCM Push Token',
-                      style: TextStyle(
-                        color: AppConstants.textBlack,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: const Text('View and copy device registration ID for push debugging', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                    trailing: const Icon(Icons.copy, size: 16, color: AppConstants.textMuted),
-                    onTap: () async {
-                      final token = await NotificationService.instance.getDeviceToken();
-                      if (token != null) {
-                        await Clipboard.setData(ClipboardData(text: token));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Device FCM Token copied to clipboard!'), backgroundColor: AppConstants.statusSuccess),
-                          );
-                        }
-                      }
-                    },
-                  ),
-                  const Divider(height: 14, color: AppConstants.borderSubtle),
-
-                  // 5. Change Password
+                  // 4. Change Password
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.lock_reset, size: 20, color: AppConstants.darkBlue),

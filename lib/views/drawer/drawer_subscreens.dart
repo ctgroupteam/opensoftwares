@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/constants.dart';
 import '../../core/svg_icons.dart';
 import '../../core/theme.dart';
+import '../../models/crm_profile.dart';
 import '../../models/crm_record.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/crm_provider.dart';
@@ -472,4 +473,544 @@ class ExecutiveReportsScreen extends ConsumerWidget {
     );
   }
 }
+
+// -------------------------------------------------------------
+// 6. DEDICATED REGIONAL TEAM OPERATIONS SCREEN (Gulbarga / Solapur)
+// -------------------------------------------------------------
+class TeamViewScreen extends ConsumerStatefulWidget {
+  final String teamName;
+  const TeamViewScreen({super.key, required this.teamName});
+
+  @override
+  ConsumerState<TeamViewScreen> createState() => _TeamViewScreenState();
+}
+
+class _TeamViewScreenState extends ConsumerState<TeamViewScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  List<CrmProfile> _members = [];
+  bool _isLoadingMembers = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _loadTeamMembers();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadTeamMembers() async {
+    try {
+      final allProfiles = await SupabaseService.instance.getAllProfiles();
+      if (mounted) {
+        setState(() {
+          _members = allProfiles
+              .where((p) => p.team == widget.teamName || p.team == 'Both')
+              .toList();
+          _isLoadingMembers = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingMembers = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allRecords = ref.watch(crmProvider).records;
+
+    final teamLeads = allRecords
+        .where((r) =>
+            r.entityType == 'lead' &&
+            (r.team == widget.teamName || r.team == 'Both'))
+        .toList();
+
+    final teamTasks = allRecords
+        .where((r) =>
+            r.entityType == 'task' &&
+            (r.team == widget.teamName || r.team == 'Both'))
+        .toList();
+
+    final teamCollections = allRecords
+        .where((r) =>
+            r.entityType == 'collection' &&
+            (r.team == widget.teamName || r.team == 'Both'))
+        .toList();
+
+    final totalInvoiced = teamCollections.fold<double>(
+        0.0, (sum, c) => sum + (c.amountDue));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${widget.teamName} Regional Operations'),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppConstants.darkBlue,
+          unselectedLabelColor: AppConstants.textMuted,
+          indicatorColor: AppConstants.skyBlue,
+          indicatorWeight: 3,
+          tabs: [
+            Tab(text: 'Staff (${_isLoadingMembers ? "..." : _members.length})'),
+            Tab(text: 'Leads (${teamLeads.length})'),
+            Tab(text: 'Tasks (${teamTasks.length})'),
+          ],
+        ),
+      ),
+      body: GradientBackdrop(
+        child: Column(
+          children: [
+            // Top Regional Banner & Stats
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppConstants.pureWhite,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppConstants.borderSubtle),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppConstants.skyBlue.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const AppSvgIcon(
+                          svg: AppSvgIcons.pipeline,
+                          size: 22,
+                          color: AppConstants.darkBlue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${widget.teamName} Territory Hub',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppConstants.textBlack,
+                              ),
+                            ),
+                            const Text(
+                              'Enterprise management and regional client pipeline',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppConstants.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      _buildMetricTile(
+                        'Staff',
+                        _isLoadingMembers ? '-' : '${_members.length}',
+                        AppConstants.darkBlue,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildMetricTile(
+                        'Pipeline',
+                        '${teamLeads.length}',
+                        AppConstants.skyBlue,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildMetricTile(
+                        'Pending Tasks',
+                        '${teamTasks.length}',
+                        AppConstants.statusWarning,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildMetricTile(
+                        'Invoiced',
+                        '₹${NumberFormat.compact().format(totalInvoiced)}',
+                        AppConstants.statusSuccess,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Tab Views
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Tab 1: Staff Directory
+                  _buildStaffTab(),
+
+                  // Tab 2: Regional Leads
+                  _buildLeadsTab(teamLeads),
+
+                  // Tab 3: Regional Tasks
+                  _buildTasksTab(teamTasks),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricTile(String label, String value, Color accentColor) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: accentColor.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: accentColor.withOpacity(0.18)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: accentColor,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: AppConstants.textMuted,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStaffTab() {
+    if (_isLoadingMembers) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_members.isEmpty) {
+      return Center(
+        child: Text(
+          'No members assigned to ${widget.teamName} team yet',
+          style: const TextStyle(color: AppConstants.textMuted),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _members.length,
+      itemBuilder: (context, index) {
+        final member = _members[index];
+        final roleLabel = member.role.replaceAll('_', ' ').toUpperCase();
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppConstants.darkBlue.withOpacity(0.1),
+                  child: const AppSvgIcon(
+                    svg: AppSvgIcons.user,
+                    size: 18,
+                    color: AppConstants.darkBlue,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              member.name,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppConstants.textBlack,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: member.isDisabled
+                                  ? AppConstants.statusDanger.withOpacity(0.1)
+                                  : AppConstants.statusSuccess.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              member.isDisabled ? 'Disabled' : 'Active',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: member.isDisabled
+                                  ? AppConstants.statusDanger
+                                  : AppConstants.statusSuccess,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppConstants.skyBlue.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              roleLabel,
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: AppConstants.darkBlue,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            member.mobileNumber,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppConstants.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLeadsTab(List<CrmRecord> leads) {
+    if (leads.isEmpty) {
+      return Center(
+        child: Text(
+          'No leads assigned to ${widget.teamName} team',
+          style: const TextStyle(color: AppConstants.textMuted),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: leads.length,
+      itemBuilder: (context, index) {
+        final lead = leads[index];
+        final stage = lead.leadStage;
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        lead.title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppConstants.textBlack,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppConstants.darkBlue.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        stage,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppConstants.darkBlue,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (lead.description?.isNotEmpty == true) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    lead.description!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppConstants.textMuted,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Value: ₹${NumberFormat('#,##,###').format((lead.extraData['deal_value'] as num?)?.toDouble() ?? lead.amountDue)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppConstants.statusSuccess,
+                      ),
+                    ),
+                    Text(
+                      lead.createdAt != null
+                          ? DateFormat('dd MMM yyyy').format(lead.createdAt!.toLocal())
+                          : '',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppConstants.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTasksTab(List<CrmRecord> tasks) {
+    if (tasks.isEmpty) {
+      return Center(
+        child: Text(
+          'No pending tasks for ${widget.teamName} team',
+          style: const TextStyle(color: AppConstants.textMuted),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: tasks.length,
+      itemBuilder: (context, index) {
+        final task = tasks[index];
+        final priority = task.priority.toUpperCase();
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        task.title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppConstants.textBlack,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppConstants.statusWarning.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        priority,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppConstants.statusWarning,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (task.description?.isNotEmpty == true) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    task.description!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppConstants.textMuted,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const AppSvgIcon(
+                      svg: AppSvgIcons.clock,
+                      size: 13,
+                      color: AppConstants.textMuted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      task.dueDate != null
+                          ? 'Due: ${DateFormat('dd MMM yyyy, hh:mm a').format(task.dueDate!.toLocal())}'
+                          : 'No due date',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppConstants.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 

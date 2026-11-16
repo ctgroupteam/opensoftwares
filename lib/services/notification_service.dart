@@ -46,32 +46,56 @@ class NotificationService {
       },
     );
 
-    // 2. Create Notification Channels
+    // 2. Create 5 Dedicated Notification Channels with 5 Distinct Custom Sounds
     try {
       const AndroidNotificationChannel alertsChannel = AndroidNotificationChannel(
         'alerts',
-        'High Priority Alerts & Alarms',
-        description: 'Used for urgent Quick Alerts with repeating alarm sound',
+        'Urgent Quick Alerts',
+        description: 'Urgent alarm broadcasts with repeating siren',
         importance: Importance.max,
         playSound: true,
         enableVibration: true,
+        sound: RawResourceAndroidNotificationSound('alarm_alert'),
       );
 
       const AndroidNotificationChannel remindersChannel = AndroidNotificationChannel(
         'reminders',
-        'Reminders & Meetings',
-        description: 'Scheduled reminders and meetings',
-        importance: Importance.high,
+        'Reminders & Follow-ups',
+        description: 'Scheduled reminders with crisp chime tone',
+        importance: Importance.max,
         playSound: true,
         enableVibration: true,
+        sound: RawResourceAndroidNotificationSound('sound_reminder'),
       );
 
-      const AndroidNotificationChannel generalChannel = AndroidNotificationChannel(
-        'general',
-        'General Updates',
-        description: 'General tasks and updates',
-        importance: Importance.defaultImportance,
+      const AndroidNotificationChannel meetingsChannel = AndroidNotificationChannel(
+        'meetings',
+        'Meetings & Syncs',
+        description: 'Meeting sync alerts with harmonic triad bell',
+        importance: Importance.max,
         playSound: true,
+        enableVibration: true,
+        sound: RawResourceAndroidNotificationSound('sound_meeting'),
+      );
+
+      const AndroidNotificationChannel tasksChannel = AndroidNotificationChannel(
+        'tasks',
+        'Task Assignments',
+        description: 'Task assignments and updates with modern pop chord',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        sound: RawResourceAndroidNotificationSound('sound_task'),
+      );
+
+      const AndroidNotificationChannel noticesChannel = AndroidNotificationChannel(
+        'general',
+        'Notice Board & Announcements',
+        description: 'Company broadcasts with crystal bell chime',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        sound: RawResourceAndroidNotificationSound('sound_notice'),
       );
 
       final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
@@ -80,7 +104,9 @@ class NotificationService {
       if (androidPlugin != null) {
         await androidPlugin.createNotificationChannel(alertsChannel);
         await androidPlugin.createNotificationChannel(remindersChannel);
-        await androidPlugin.createNotificationChannel(generalChannel);
+        await androidPlugin.createNotificationChannel(meetingsChannel);
+        await androidPlugin.createNotificationChannel(tasksChannel);
+        await androidPlugin.createNotificationChannel(noticesChannel);
       }
     } catch (e) {
       debugPrint('Notification channel creation error: $e');
@@ -125,47 +151,58 @@ class NotificationService {
     }
   }
 
-  // Trigger immediate local test notification to verify sound and channel
-  Future<void> sendTestNotification({bool isAlarm = false}) async {
-    final androidDetails = AndroidNotificationDetails(
-      isAlarm ? 'alerts' : 'general',
-      isAlarm ? 'High Priority Alerts & Alarms' : 'General Updates',
-      channelDescription: isAlarm
-          ? 'Used for urgent Quick Alerts with repeating alarm sound'
-          : 'General tasks and updates',
-      importance: isAlarm ? Importance.max : Importance.high,
-      priority: isAlarm ? Priority.max : Priority.high,
-      playSound: true,
-      sound: isAlarm ? const RawResourceAndroidNotificationSound('alarm_alert') : null,
-      enableVibration: true,
-      actions: isAlarm
-          ? const [
-              AndroidNotificationAction('action_seen', 'Seen', showsUserInterface: true),
-              AndroidNotificationAction('action_snooze', 'Snooze', showsUserInterface: false),
-            ]
-          : null,
-    );
-
-    final details = NotificationDetails(android: androidDetails);
+  // Show immediate Heads-Up Pop-Up Banner on Screen
+  Future<void> showHeadsUpNotification({
+    required String title,
+    required String body,
+    String type = 'reminders',
+    String? payload,
+  }) async {
+    final details = _buildChannelDetails(type, title, requireAck: type == 'alerts');
+    final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      isAlarm ? 'CRM Alarm Alert Test' : 'CRM Notification Test',
-      isAlarm
-          ? 'Insistent high-priority alarm notification is active and working!'
-          : 'Standard notification channel is verified and active.',
-      details,
-      payload: 'quick_alert',
+      notificationId,
+      title,
+      body,
+      NotificationDetails(android: details),
+      payload: payload ?? 'home',
     );
   }
 
-  // Retrieve current FCM Device Token
-  Future<String?> getDeviceToken() async {
-    try {
-      return await FirebaseMessaging.instance.getToken();
-    } catch (e) {
-      debugPrint('Error getting FCM token: $e');
-      return null;
+  // Trigger test notifications for any of the 5 custom sound channels
+  Future<void> sendTestNotification(String soundType) async {
+    String title = 'CRM Alert Test';
+    String body = 'Testing notification popup and custom sound';
+
+    switch (soundType) {
+      case 'alarm':
+        title = 'Urgent Quick Alert (Alarm Sound)';
+        body = 'Insistent siren alert popped up on screen!';
+        break;
+      case 'reminder':
+        title = 'Reminder: Follow-up Scheduled';
+        body = 'Two-tone reminder chime popped up on screen!';
+        break;
+      case 'meeting':
+        title = 'Meeting in 15 Minutes';
+        body = 'Executive C-Major triad bell popped up on screen!';
+        break;
+      case 'task':
+        title = 'New Task Assigned';
+        body = 'Upbeat task pop sound popped up on screen!';
+        break;
+      case 'notice':
+        title = 'New Notice: Team Announcement';
+        body = 'Crystal harmonic chime popped up on screen!';
+        break;
     }
+
+    await showHeadsUpNotification(
+      title: title,
+      body: body,
+      type: soundType,
+      payload: soundType == 'alarm' ? 'quick_alert' : 'home',
+    );
   }
 
   // Save FCM Token to crm_notifications table for current user
@@ -196,72 +233,92 @@ class NotificationService {
     } catch (_) {}
   }
 
-  // Display Local Notification (Foreground or Data Message)
+  // Display Local Heads-Up Banner Notification for Foreground or Data FCM Messages
   static Future<void> showLocalNotification(RemoteMessage message) async {
     final data = message.data;
     final title = data['title'] ?? message.notification?.title ?? 'OpenSoftwares CRM';
-    final body = data['body'] ?? message.notification?.body ?? 'New notification received';
+    final body = data['body'] ?? message.notification?.body ?? 'New update received';
     final type = data['type'] ?? 'general';
     final bool requireAck = data['require_ack'] == 'true';
 
-    // Channel selection
-    String channelId = 'general';
-    Importance importance = Importance.defaultImportance;
-    Priority priority = Priority.defaultPriority;
-    AndroidNotificationDetails androidDetails;
-
-    if (type == 'alerts' || requireAck) {
-      channelId = 'alerts';
-      importance = Importance.max;
-      priority = Priority.max;
-
-      // 0x04 flag represents FLAG_INSISTENT (keeps ringing until dismissed/opened)
-      androidDetails = AndroidNotificationDetails(
-        channelId,
-        'High Priority Alerts & Alarms',
-        importance: importance,
-        priority: priority,
-        sound: const RawResourceAndroidNotificationSound('alarm_alert'),
-        playSound: true,
-        enableVibration: true,
-        additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT = 4
-        actions: const [
-          AndroidNotificationAction('action_seen', 'Seen', showsUserInterface: true),
-          AndroidNotificationAction('action_snooze', 'Snooze', showsUserInterface: false),
-        ],
-      );
-    } else if (type == 'reminders' || type == 'meeting') {
-      channelId = 'reminders';
-      importance = Importance.high;
-      priority = Priority.high;
-      androidDetails = AndroidNotificationDetails(
-        channelId,
-        'Reminders & Meetings',
-        importance: importance,
-        priority: priority,
-        playSound: true,
-        enableVibration: true,
-      );
-    } else {
-      androidDetails = AndroidNotificationDetails(
-        channelId,
-        'General Updates',
-        importance: importance,
-        priority: priority,
-        playSound: true,
-      );
-    }
-
-    final NotificationDetails platformDetails =
-        NotificationDetails(android: androidDetails);
-
+    final androidDetails = _buildChannelDetails(type, title, requireAck: requireAck);
+    final notificationDetails = NotificationDetails(android: androidDetails);
     final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
     await _localNotifications.show(
       notificationId,
       title,
       body,
-      platformDetails,
+      notificationDetails,
       payload: data['click_action'] ?? data['target_screen'] ?? 'home',
+    );
+  }
+
+  // Internal builder for Android Notification Details with heads-up display & 5 custom sounds
+  static AndroidNotificationDetails _buildChannelDetails(
+    String type,
+    String ticker, {
+    bool requireAck = false,
+  }) {
+    String channelId;
+    String channelName;
+    String soundFile;
+    List<AndroidNotificationAction>? actions;
+    Int32List? flags;
+
+    switch (type) {
+      case 'alerts':
+      case 'alarm':
+        channelId = 'alerts';
+        channelName = 'Urgent Quick Alerts';
+        soundFile = 'alarm_alert';
+        flags = requireAck ? Int32List.fromList([4]) : null; // FLAG_INSISTENT
+        actions = const [
+          AndroidNotificationAction('action_seen', 'Seen', showsUserInterface: true),
+          AndroidNotificationAction('action_snooze', 'Snooze', showsUserInterface: false),
+        ];
+        break;
+      case 'reminders':
+      case 'reminder':
+      case 'followup':
+        channelId = 'reminders';
+        channelName = 'Reminders & Follow-ups';
+        soundFile = 'sound_reminder';
+        break;
+      case 'meetings':
+      case 'meeting':
+        channelId = 'meetings';
+        channelName = 'Meetings & Syncs';
+        soundFile = 'sound_meeting';
+        break;
+      case 'tasks':
+      case 'task':
+        channelId = 'tasks';
+        channelName = 'Task Assignments';
+        soundFile = 'sound_task';
+        break;
+      case 'general':
+      case 'notice':
+      default:
+        channelId = 'general';
+        channelName = 'Notice Board & Announcements';
+        soundFile = 'sound_notice';
+        break;
+    }
+
+    return AndroidNotificationDetails(
+      channelId,
+      channelName,
+      importance: Importance.max,
+      priority: Priority.max,
+      fullScreenIntent: true,
+      visibility: NotificationVisibility.public,
+      ticker: ticker,
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound(soundFile),
+      enableVibration: true,
+      additionalFlags: flags,
+      actions: actions,
     );
   }
 }

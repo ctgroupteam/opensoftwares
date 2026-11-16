@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import '../../models/crm_record.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/crm_provider.dart';
+import '../../services/notification_service.dart';
 
 class HomeScreen extends ConsumerWidget {
   final Function(int)? onNavigateTab;
@@ -113,6 +114,16 @@ class HomeScreen extends ConsumerWidget {
                   );
 
                   await ref.read(crmProvider.notifier).addRecord(newRecord);
+                  
+                  // Trigger immediate heads-up popup on device with sound
+                  await NotificationService.instance.showHeadsUpNotification(
+                    title: '[REMINDER] ${titleController.text.trim()}',
+                    body: noteController.text.trim().isNotEmpty
+                        ? noteController.text.trim()
+                        : 'Reminder scheduled for ${DateFormat('hh:mm a').format(selectedTime)}',
+                    type: 'reminders',
+                  );
+
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(

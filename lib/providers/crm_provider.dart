@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/crm_record.dart';
 import '../services/offline_cache_service.dart';
 import '../services/supabase_service.dart';
-import 'team_filter_provider.dart';
 
 class CrmState {
   final List<CrmRecord> records;
@@ -112,13 +111,9 @@ final crmProvider = StateNotifierProvider<CrmNotifier, CrmState>((ref) {
   return CrmNotifier();
 });
 
-// Filtered Selectors with Team Filter
+// Filtered Selectors (Unified Company View)
 final teamFilteredRecordsProvider = Provider<List<CrmRecord>>((ref) {
-  final records = ref.watch(crmProvider).records;
-  final selectedTeam = ref.watch(teamFilterProvider);
-
-  if (selectedTeam == 'Both') return records;
-  return records.where((r) => r.team == selectedTeam || r.team == 'Both').toList();
+  return ref.watch(crmProvider).records;
 });
 
 final productsProvider = Provider<List<CrmRecord>>((ref) {

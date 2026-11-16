@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../core/svg_icons.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/team_filter_provider.dart';
 import '../admin/admin_panel_screen.dart';
 import '../profile/profile_screen.dart';
 import '../quick_alert/quick_alert_screen.dart';
@@ -132,20 +131,30 @@ class CrmDrawer extends ConsumerWidget {
                 const Divider(height: 16, color: AppConstants.borderSubtle),
                 _buildDrawerItem(
                   context,
-                  svg: AppSvgIcons.pipeline,
+                  svg: AppSvgIcons.user,
                   title: 'Gulbarga Team',
                   onTap: () {
-                    ref.read(teamFilterProvider.notifier).state = 'Gulbarga';
                     Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const TeamViewScreen(teamName: 'Gulbarga'),
+                      ),
+                    );
                   },
                 ),
                 _buildDrawerItem(
                   context,
-                  svg: AppSvgIcons.pipeline,
+                  svg: AppSvgIcons.user,
                   title: 'Solapur Team',
                   onTap: () {
-                    ref.read(teamFilterProvider.notifier).state = 'Solapur';
                     Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const TeamViewScreen(teamName: 'Solapur'),
+                      ),
+                    );
                   },
                 ),
                 const Divider(height: 16, color: AppConstants.borderSubtle),
