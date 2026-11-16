@@ -17,6 +17,20 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  String _selectedSound = NotificationService.defaultSound;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSelectedSound();
+  }
+
+  Future<void> _loadSelectedSound() async {
+    final sound = await NotificationService.instance.getSelectedSound();
+    if (mounted) {
+      setState(() => _selectedSound = sound);
+    }
+  }
   void _showChangePasswordDialog(BuildContext context) {
     final newPassCtrl = TextEditingController();
 
@@ -216,87 +230,111 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const Divider(height: 20, color: AppConstants.borderSubtle),
 
-                  // 2. Five Custom Sound Testers (Heads-Up Screen Popups)
-                  const Text(
-                    'Test Notification Sounds On Device (5 Tones)',
-                    style: TextStyle(
-                      color: AppConstants.textBlack,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  // 2. Notification Sound Selection (Unified Sound with 5 choices)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      ActionChip(
-                        avatar: const Icon(Icons.warning_amber_rounded, size: 16, color: AppConstants.statusDanger),
-                        label: const Text('Alarm Tone', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                        backgroundColor: AppConstants.backgroundLight,
-                        onPressed: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          await NotificationService.instance.sendTestNotification('alarm');
-                          if (!mounted) return;
-                          messenger.showSnackBar(
-                            const SnackBar(content: Text('Alarm Siren notification popped up on screen!'), backgroundColor: AppConstants.statusSuccess),
-                          );
-                        },
+                      const Text(
+                        'Notification Sound',
+                        style: TextStyle(
+                          color: AppConstants.textBlack,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      ActionChip(
-                        avatar: const Icon(Icons.notifications_active_outlined, size: 16, color: AppConstants.skyBlue),
-                        label: const Text('Reminder Chime', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                        backgroundColor: AppConstants.backgroundLight,
-                        onPressed: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          await NotificationService.instance.sendTestNotification('reminder');
-                          if (!mounted) return;
-                          messenger.showSnackBar(
-                            const SnackBar(content: Text('Reminder Chime notification popped up on screen!'), backgroundColor: AppConstants.statusSuccess),
-                          );
-                        },
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.calendar_month_outlined, size: 16, color: AppConstants.accentCyan),
-                        label: const Text('Meeting Bell', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                        backgroundColor: AppConstants.backgroundLight,
-                        onPressed: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          await NotificationService.instance.sendTestNotification('meeting');
-                          if (!mounted) return;
-                          messenger.showSnackBar(
-                            const SnackBar(content: Text('Meeting Triad Bell notification popped up on screen!'), backgroundColor: AppConstants.statusSuccess),
-                          );
-                        },
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.check_circle_outline, size: 16, color: AppConstants.statusSuccess),
-                        label: const Text('Task Pop', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                        backgroundColor: AppConstants.backgroundLight,
-                        onPressed: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          await NotificationService.instance.sendTestNotification('task');
-                          if (!mounted) return;
-                          messenger.showSnackBar(
-                            const SnackBar(content: Text('Task Pop notification popped up on screen!'), backgroundColor: AppConstants.statusSuccess),
-                          );
-                        },
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.campaign_outlined, size: 16, color: AppConstants.statusWarning),
-                        label: const Text('Notice Harmonics', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                        backgroundColor: AppConstants.backgroundLight,
-                        onPressed: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          await NotificationService.instance.sendTestNotification('notice');
-                          if (!mounted) return;
-                          messenger.showSnackBar(
-                            const SnackBar(content: Text('Notice Crystal Chime notification popped up on screen!'), backgroundColor: AppConstants.statusSuccess),
-                          );
-                        },
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppConstants.skyBlue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          NotificationService.availableSounds[_selectedSound] ?? 'Reminder Chime',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppConstants.darkBlue,
+                          ),
+                        ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Select the sound to play for all notifications in the app (default: Reminder Chime)',
+                    style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                  ),
+                  const SizedBox(height: 10),
+                  ...NotificationService.availableSounds.entries.map((entry) {
+                    final isSelected = _selectedSound == entry.key;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppConstants.skyBlue.withOpacity(0.08) : AppConstants.backgroundLight,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected ? AppConstants.skyBlue : AppConstants.borderSubtle,
+                        ),
+                      ),
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                        leading: Radio<String>(
+                          value: entry.key,
+                          groupValue: _selectedSound,
+                          activeColor: AppConstants.darkBlue,
+                          onChanged: (val) async {
+                            if (val == null) return;
+                            final messenger = ScaffoldMessenger.of(context);
+                            setState(() => _selectedSound = val);
+                            await NotificationService.instance.setSelectedSound(val);
+                            if (mounted) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text('Notification sound set to ${entry.value}'),
+                                  backgroundColor: AppConstants.statusSuccess,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                        title: Text(
+                          entry.value,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected ? AppConstants.darkBlue : AppConstants.textBlack,
+                          ),
+                        ),
+                        trailing: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            minimumSize: const Size(50, 28),
+                            side: const BorderSide(color: AppConstants.skyBlue),
+                          ),
+                          onPressed: () async {
+                            await NotificationService.instance.sendTestNotification(entry.key);
+                          },
+                          child: const Text('Test', style: TextStyle(fontSize: 11, color: AppConstants.skyBlue)),
+                        ),
+                        onTap: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          setState(() => _selectedSound = entry.key);
+                          await NotificationService.instance.setSelectedSound(entry.key);
+                          if (mounted) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Notification sound set to ${entry.value}'),
+                                backgroundColor: AppConstants.statusSuccess,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    );
+                  }),
                   const Divider(height: 20, color: AppConstants.borderSubtle),
 
                   // 3. GitHub In-App Auto-Updater
