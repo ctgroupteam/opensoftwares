@@ -285,11 +285,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           activeColor: AppConstants.darkBlue,
                           onChanged: (val) async {
                             if (val == null) return;
-                            final messenger = ScaffoldMessenger.of(context);
                             setState(() => _selectedSound = val);
                             await NotificationService.instance.setSelectedSound(val);
                             if (mounted) {
-                              messenger.showSnackBar(
+                              ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text('Notification sound set to ${entry.value}'),
                                   backgroundColor: AppConstants.statusSuccess,
@@ -319,11 +318,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           child: const Text('Test', style: TextStyle(fontSize: 11, color: AppConstants.skyBlue)),
                         ),
                         onTap: () async {
-                          final messenger = ScaffoldMessenger.of(context);
                           setState(() => _selectedSound = entry.key);
                           await NotificationService.instance.setSelectedSound(entry.key);
                           if (mounted) {
-                            messenger.showSnackBar(
+                            ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Notification sound set to ${entry.value}'),
                                 backgroundColor: AppConstants.statusSuccess,
