@@ -49,8 +49,9 @@ The entire CRM is modeled into 3 ultra-fast, indexed PostgreSQL tables in Supaba
 ---
 
 ## ═══ Production Release Artifacts ═══
+- **Dedicated Output Folder**: `output apk/`
+- **Production Signed APK**: `output apk/OpenSoftwares-CRM-release.apk` (Size: ~10.0 MB)
 - **Production Keystore Location**: `android/app/opensoftwares-release.jks` (Key Alias: `opensoftwares`)
-- **Production Signed APK**: `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (Size: ~10.0 MB)
 - **Obfuscation Symbols**: `build/symbols`
 
 ### How to Rebuild the APK:

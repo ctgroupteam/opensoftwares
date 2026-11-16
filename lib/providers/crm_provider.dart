@@ -97,6 +97,10 @@ class CrmNotifier extends StateNotifier<CrmState> {
     }
   }
 
+  void clear() {
+    state = CrmState(records: [], isLoading: false);
+  }
+
   @override
   void dispose() {
     _subscription?.unsubscribe();
@@ -171,3 +175,4 @@ final activityLogsProvider = Provider<List<CrmRecord>>((ref) {
   final records = ref.watch(crmProvider).records;
   return records.where((r) => r.entityType == 'activity_log').toList();
 });
+

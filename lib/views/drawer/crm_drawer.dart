@@ -5,6 +5,7 @@ import '../../core/svg_icons.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/team_filter_provider.dart';
 import '../admin/admin_panel_screen.dart';
+import '../profile/profile_screen.dart';
 import '../quick_alert/quick_alert_screen.dart';
 import 'drawer_subscreens.dart';
 
@@ -158,6 +159,23 @@ class CrmDrawer extends ConsumerWidget {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const QuickAlertScreen()));
                   },
                 ),
+                _buildDrawerItem(
+                  context,
+                  svg: AppSvgIcons.settings,
+                  title: 'Settings & Cloud Updates',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(title: const Text('Settings & Cloud Updates')),
+                          body: const ProfileScreen(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 if (isAdmin) ...[
                   _buildDrawerItem(
                     context,
@@ -177,11 +195,11 @@ class CrmDrawer extends ConsumerWidget {
           // Pinned Drawer Footer: Developer Attribution
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppConstants.backgroundLight,
               border: Border(top: BorderSide(color: AppConstants.borderSubtle)),
             ),
-            child: Row(
+            child: const Row(
               children: [
                 AppSvgIcon(svg: AppSvgIcons.settings, size: 16, color: AppConstants.textMuted),
                 SizedBox(width: 10),

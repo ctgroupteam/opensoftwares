@@ -91,7 +91,14 @@ ALTER TABLE public.crm_notifications ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION public.crm_get_user_role()
 RETURNS TEXT AS $$
     SELECT role FROM public.crm_profiles WHERE id = auth.uid() LIMIT 1;
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
+-- Helper to safely fetch partner IDs for channel partner RLS without recursion
+CREATE OR REPLACE FUNCTION public.crm_get_partner_ids_for_user(p_uid UUID)
+RETURNS SETOF UUID AS $$
+    SELECT id FROM public.crm_records 
+    WHERE entity_type = 'partner' AND (assigned_to = p_uid OR created_by = p_uid);
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 -- RLS for crm_profiles
 DROP POLICY IF EXISTS "profiles_select_policy" ON public.crm_profiles;
@@ -133,10 +140,7 @@ CREATE POLICY "records_partner_select_policy" ON public.crm_records
         AND (
             assigned_to = auth.uid() 
             OR created_by = auth.uid()
-            OR partner_id IN (
-                SELECT id FROM public.crm_records 
-                WHERE entity_type = 'partner' AND (assigned_to = auth.uid() OR created_by = auth.uid())
-            )
+            OR partner_id IN (SELECT public.crm_get_partner_ids_for_user(auth.uid()))
         )
     );
 
@@ -325,7 +329,9 @@ BEGIN
         v_user_id := gen_random_uuid();
         INSERT INTO auth.users (
             instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-            raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+            raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+            confirmation_token, recovery_token, email_change_token_new, email_change,
+            phone_change_token, reauthentication_token, email_change_token_current, phone_change
         ) VALUES (
             '00000000-0000-0000-0000-000000000000',
             v_user_id,
@@ -337,8 +343,22 @@ BEGIN
             '{"provider":"email","providers":["email"]}'::jsonb,
             jsonb_build_object('name', p_name, 'mobile', p_mobile, 'role', p_role),
             now(),
-            now()
+            now(),
+            '', '', '', '', '', '', '', ''
         );
+
+        INSERT INTO auth.identities (
+            id, provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+        ) VALUES (
+            gen_random_uuid(),
+            v_user_id::text,
+            v_user_id,
+            jsonb_build_object('sub', v_user_id::text, 'email', v_email, 'email_verified', true, 'phone_verified', false),
+            'email',
+            now(),
+            now(),
+            now()
+        ) ON CONFLICT (provider, provider_id) DO NOTHING;
 
         INSERT INTO public.crm_profiles (
             id, mobile_number, name, role, team, permissions, is_disabled
@@ -349,7 +369,7 @@ BEGIN
 
     RETURN jsonb_build_object('success', true, 'user_id', v_user_id);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth;
 
 -- Admin Update User RPC
 CREATE OR REPLACE FUNCTION public.crm_admin_update_user(
@@ -420,3 +440,4 @@ BEGIN
     RETURN jsonb_build_object('success', true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+

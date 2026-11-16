@@ -338,16 +338,40 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                if (nameCtrl.text.trim().isEmpty || mobileCtrl.text.trim().isEmpty || passCtrl.text.trim().isEmpty) return;
+                final rawMobile = mobileCtrl.text.trim();
+                final cleanMobile = AppConstants.sanitizeMobile(rawMobile);
+                final password = passCtrl.text.trim();
+                final name = nameCtrl.text.trim();
+
+                if (name.isEmpty || cleanMobile.isEmpty || password.isEmpty) return;
                 Navigator.pop(ctx);
-                await SupabaseService.instance.adminCreateUser(
-                  mobile: mobileCtrl.text.trim(),
-                  password: passCtrl.text.trim(),
-                  name: nameCtrl.text.trim(),
-                  role: role,
-                  team: team,
-                );
-                _fetchUsers();
+                try {
+                  await SupabaseService.instance.adminCreateUser(
+                    mobile: cleanMobile,
+                    password: password,
+                    name: name,
+                    role: role,
+                    team: team,
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Account for $name (+91 $cleanMobile) created successfully!'),
+                        backgroundColor: AppConstants.statusSuccess,
+                      ),
+                    );
+                  }
+                  _fetchUsers();
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to create user: $e'),
+                        backgroundColor: AppConstants.statusDanger,
+                      ),
+                    );
+                  }
+                }
               },
               child: const Text('Create User'),
             ),
@@ -391,3 +415,4 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
     );
   }
 }
+

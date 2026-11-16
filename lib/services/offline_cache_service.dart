@@ -32,3 +32,4 @@ class OfflineCacheService {
     await prefs.remove(_keyRecords);
   }
 }
+

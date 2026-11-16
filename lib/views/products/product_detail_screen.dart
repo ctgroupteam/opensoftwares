@@ -30,6 +30,113 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen>
     super.dispose();
   }
 
+  void _showEditProductDialog(BuildContext context, WidgetRef ref, CrmRecord product) {
+    final titleCtrl = TextEditingController(text: product.title);
+    final descCtrl = TextEditingController(text: product.description ?? '');
+    final priceCtrl = TextEditingController(text: product.productPrice);
+    final featuresCtrl = TextEditingController(text: product.productFeatures.join(', '));
+    String status = product.status;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Edit Software Product', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: 'Product Name'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: priceCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'License Price (₹)'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: featuresCtrl,
+                  decoration: const InputDecoration(labelText: 'Key Features (comma-separated)'),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: ['active', 'in_development', 'retired'].contains(status) ? status : 'active',
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: const [
+                    DropdownMenuItem(value: 'active', child: Text('Active / Production')),
+                    DropdownMenuItem(value: 'in_development', child: Text('In Development')),
+                    DropdownMenuItem(value: 'retired', child: Text('Retired / Legacy')),
+                  ],
+                  onChanged: (v) => setDialogState(() => status = v!),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                if (titleCtrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx);
+                final features = featuresCtrl.text
+                    .split(',')
+                    .map((f) => f.trim())
+                    .where((f) => f.isNotEmpty)
+                    .toList();
+
+                final extra = Map<String, dynamic>.from(product.extraData);
+                extra['price'] = priceCtrl.text.trim();
+                extra['features'] = features;
+
+                final updated = product.copyWith(
+                  title: titleCtrl.text.trim(),
+                  description: descCtrl.text.trim(),
+                  status: status,
+                  extraData: extra,
+                );
+                ref.read(crmProvider.notifier).updateRecord(updated);
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref, CrmRecord product) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete ${product.title}?'),
+        content: const Text(
+          'Are you sure you want to delete this software product? All linked leads and tasks will also be removed.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.statusDanger),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(crmProvider.notifier).deleteRecord(product.id);
+              Navigator.pop(context);
+            },
+            child: const Text('Delete Product'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final allRecords = ref.watch(crmProvider).records;
@@ -51,11 +158,14 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen>
         title: Text(currentProduct.title),
         actions: [
           IconButton(
+            icon: const Icon(Icons.edit_outlined, color: AppConstants.skyBlue),
+            tooltip: 'Edit Product',
+            onPressed: () => _showEditProductDialog(context, ref, currentProduct),
+          ),
+          IconButton(
             icon: const Icon(Icons.delete_outline, color: AppConstants.statusDanger),
-            onPressed: () {
-              ref.read(crmProvider.notifier).deleteRecord(currentProduct.id);
-              Navigator.pop(context);
-            },
+            tooltip: 'Delete Product',
+            onPressed: () => _confirmDelete(context, ref, currentProduct),
           ),
         ],
         bottom: TabBar(

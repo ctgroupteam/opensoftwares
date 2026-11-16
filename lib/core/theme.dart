@@ -175,3 +175,4 @@ class GradientBackdrop extends StatelessWidget {
     );
   }
 }
+

@@ -35,3 +35,4 @@ for (let i = 0; i < numSamples; i++) {
 const soundPath = path.join(dir, 'alarm_alert.wav');
 fs.writeFileSync(soundPath, buffer);
 console.log('alarm_alert.wav created at:', soundPath);
+

@@ -88,16 +88,26 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
               label: const Text('Add Partner'),
             )
           : null,
-      body: partners.isEmpty
-          ? _buildEmptyView('No channel partners added yet')
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount: partners.length,
-              itemBuilder: (context, index) {
-                final partner = partners[index];
-                return _buildPartnerCard(partner);
-              },
-            ),
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(crmProvider.notifier).refresh(),
+        child: partners.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  const SizedBox(height: 80),
+                  _buildEmptyView('No channel partners added yet'),
+                ],
+              )
+            : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                itemCount: partners.length,
+                itemBuilder: (context, index) {
+                  final partner = partners[index];
+                  return _buildPartnerCard(partner);
+                },
+              ),
+      ),
     );
   }
 
@@ -232,12 +242,21 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
         icon: const AppSvgIcon(svg: AppSvgIcons.plus, size: 16, color: Colors.white),
         label: const Text('Add Follow-up'),
       ),
-      body: followups.isEmpty
-          ? _buildEmptyView('No client follow-ups pending')
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount: followups.length,
-              itemBuilder: (context, index) {
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(crmProvider.notifier).refresh(),
+        child: followups.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  const SizedBox(height: 80),
+                  _buildEmptyView('No client follow-ups pending'),
+                ],
+              )
+            : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                itemCount: followups.length,
+                itemBuilder: (context, index) {
                 final item = followups[index];
                 final dateStr = item.dueDate != null
                     ? DateFormat('dd MMM yyyy').format(item.dueDate!)
@@ -269,6 +288,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                 );
               },
             ),
+      ),
     );
   }
 
@@ -288,12 +308,21 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
         icon: const AppSvgIcon(svg: AppSvgIcons.plus, size: 16, color: Colors.white),
         label: const Text('Record Invoice'),
       ),
-      body: collections.isEmpty
-          ? _buildEmptyView('No collections currently recorded')
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount: collections.length,
-              itemBuilder: (context, index) {
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(crmProvider.notifier).refresh(),
+        child: collections.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  const SizedBox(height: 80),
+                  _buildEmptyView('No collections currently recorded'),
+                ],
+              )
+            : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                itemCount: collections.length,
+                itemBuilder: (context, index) {
                 final item = collections[index];
                 final balance = item.amountDue - item.amountReceived;
                 final isPaid = balance <= 0;
@@ -373,6 +402,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                 );
               },
             ),
+      ),
     );
   }
 
@@ -574,3 +604,4 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
     );
   }
 }
+

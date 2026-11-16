@@ -12,8 +12,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _mobileController = TextEditingController(text: AppConstants.adminFixedNumber);
-  final _passwordController = TextEditingController(text: '#kotlin');
+  final _mobileController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   String? _localError;
 
@@ -25,11 +25,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    final mobile = _mobileController.text.trim();
+    FocusScope.of(context).unfocus();
+    final rawMobile = _mobileController.text.trim();
     final password = _passwordController.text.trim();
+
+    final mobile = AppConstants.sanitizeMobile(rawMobile);
 
     if (mobile.isEmpty || password.isEmpty) {
       setState(() => _localError = 'Please enter mobile number and password');
+      return;
+    }
+
+    if (mobile.length < 10) {
+      setState(() => _localError = 'Please enter a valid 10-digit mobile number');
       return;
     }
 
@@ -37,7 +45,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final success = await ref.read(authProvider.notifier).login(mobile, password);
     if (!success && mounted) {
       final authError = ref.read(authProvider).errorMessage;
-      setState(() => _localError = authError ?? 'Login failed. Please check credentials.');
+      String friendlyMessage = 'Login failed. Please verify credentials.';
+      if (authError != null) {
+        if (authError.contains('Invalid login credentials') || authError.contains('invalid_credentials')) {
+          friendlyMessage = 'Invalid mobile number or password.';
+        } else if (authError.contains('disabled')) {
+          friendlyMessage = authError;
+        } else if (authError.contains('network') || authError.contains('SocketException')) {
+          friendlyMessage = 'Network connection issue. Please check your internet.';
+        } else {
+          friendlyMessage = authError.replaceAll(RegExp(r'AuthException\(message: |statusCode: \d+\)'), '').trim();
+        }
+      }
+      setState(() => _localError = friendlyMessage);
     }
   }
 
@@ -46,8 +66,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authProvider);
 
     return Scaffold(
-      body: GradientBackdrop(
-        child: SafeArea(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: GradientBackdrop(
+          child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -221,6 +244,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

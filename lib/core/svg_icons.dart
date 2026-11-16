@@ -160,3 +160,4 @@ class AppSvgIcon extends StatelessWidget {
     );
   }
 }
+

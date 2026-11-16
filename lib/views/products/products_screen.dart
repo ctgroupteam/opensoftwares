@@ -87,6 +87,114 @@ class ProductsScreen extends ConsumerWidget {
     );
   }
 
+  void _showEditProductDialog(BuildContext context, WidgetRef ref, CrmRecord product) {
+    final titleCtrl = TextEditingController(text: product.title);
+    final descCtrl = TextEditingController(text: product.description ?? '');
+    final priceCtrl = TextEditingController(text: product.productPrice);
+    final featuresCtrl = TextEditingController(text: product.productFeatures.join(', '));
+    String status = product.status;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Edit Software Product', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: 'Product Name'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: priceCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'License Price (₹)'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: featuresCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Key Features (comma-separated)',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: ['active', 'in_development', 'retired'].contains(status) ? status : 'active',
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: const [
+                    DropdownMenuItem(value: 'active', child: Text('Active / Production')),
+                    DropdownMenuItem(value: 'in_development', child: Text('In Development')),
+                    DropdownMenuItem(value: 'retired', child: Text('Retired / Legacy')),
+                  ],
+                  onChanged: (v) => setDialogState(() => status = v!),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                if (titleCtrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx);
+                final features = featuresCtrl.text
+                    .split(',')
+                    .map((f) => f.trim())
+                    .where((f) => f.isNotEmpty)
+                    .toList();
+
+                final extra = Map<String, dynamic>.from(product.extraData);
+                extra['price'] = priceCtrl.text.trim();
+                extra['features'] = features;
+
+                final updated = product.copyWith(
+                  title: titleCtrl.text.trim(),
+                  description: descCtrl.text.trim(),
+                  status: status,
+                  extraData: extra,
+                );
+                ref.read(crmProvider.notifier).updateRecord(updated);
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteProductDialog(BuildContext context, WidgetRef ref, CrmRecord product) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete ${product.title}?'),
+        content: const Text(
+          'Are you sure you want to permanently delete this software product? All linked pitching records, leads, and tasks will also be removed.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.statusDanger),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(crmProvider.notifier).deleteRecord(product.id);
+            },
+            child: const Text('Delete Product'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final products = ref.watch(productsProvider);
@@ -106,12 +214,26 @@ class ProductsScreen extends ConsumerWidget {
                 label: const Text('Add Product'),
               )
             : null,
-        body: products.isEmpty
-            ? const Center(child: Text('No products available', style: TextStyle(color: AppConstants.textMuted)))
-            : ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                itemCount: products.length,
-                itemBuilder: (context, index) {
+        body: RefreshIndicator(
+          onRefresh: () => ref.read(crmProvider.notifier).refresh(),
+          child: products.isEmpty
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(height: 100),
+                    Center(
+                      child: Text(
+                        'No software products registered yet',
+                        style: TextStyle(color: AppConstants.textMuted, fontSize: 14),
+                      ),
+                    ),
+                  ],
+                )
+              : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
                   final product = products[index];
                   final priceNum = double.tryParse(product.productPrice) ?? 0;
                   final formattedPrice = NumberFormat('#,##,###').format(priceNum);
@@ -194,19 +316,42 @@ class ProductsScreen extends ConsumerWidget {
                                   .toList(),
                             ),
                             const SizedBox(height: 12),
-                            const Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  'Manage Modules & Leads',
-                                  style: TextStyle(
-                                    color: AppConstants.darkBlue,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined, size: 18, color: AppConstants.skyBlue),
+                                      tooltip: 'Edit Product',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => _showEditProductDialog(context, ref, product),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 18, color: AppConstants.statusDanger),
+                                      tooltip: 'Delete Product',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => _showDeleteProductDialog(context, ref, product),
+                                    ),
+                                  ],
                                 ),
-                                SizedBox(width: 4),
-                                Icon(Icons.arrow_forward_ios, size: 10, color: AppConstants.darkBlue),
+                                const Row(
+                                  children: [
+                                    Text(
+                                      'Manage Modules & Leads',
+                                      style: TextStyle(
+                                        color: AppConstants.darkBlue,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    SizedBox(width: 4),
+                                    Icon(Icons.arrow_forward_ios, size: 10, color: AppConstants.darkBlue),
+                                  ],
+                                ),
                               ],
                             ),
                           ],
@@ -216,7 +361,9 @@ class ProductsScreen extends ConsumerWidget {
                   );
                 },
               ),
+        ),
       ),
     );
   }
 }
+

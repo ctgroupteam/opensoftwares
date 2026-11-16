@@ -6,6 +6,9 @@ class AppConstants {
   static const String developerAttribution = 'Yahya Mundewadi - yahya.in';
   static const String adminFixedNumber = '9307426215';
 
+  // GitHub Auto-Updater
+  static const String githubRepo = 'mdyahhya/opensoftwares_crm';
+
   // Supabase Configuration
   static const String supabaseUrl = 'https://jjraluhoybumzpdikark.supabase.co';
   static const String supabaseAnonKey =
@@ -29,6 +32,21 @@ class AppConstants {
   // Teams
   static const List<String> teams = ['Gulbarga', 'Solapur', 'Both'];
 
+  // Mobile sanitizer helper (strips +91, 0, spaces, dashes)
+  static String sanitizeMobile(String mobile) {
+    var cleaned = mobile.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleaned.length == 12 && cleaned.startsWith('91')) {
+      cleaned = cleaned.substring(2);
+    } else if (cleaned.length == 11 && cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+    return cleaned;
+  }
+
   // Email alias helper
-  static String formatEmail(String mobile) => '${mobile.trim()}@opensoftwares.app';
+  static String formatEmail(String mobile) {
+    final sanitized = sanitizeMobile(mobile);
+    return '$sanitized@opensoftwares.app';
+  }
 }
+

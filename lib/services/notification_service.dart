@@ -47,40 +47,43 @@ class NotificationService {
     );
 
     // 2. Create Notification Channels
-    const AndroidNotificationChannel alertsChannel = AndroidNotificationChannel(
-      'alerts',
-      'High Priority Alerts & Alarms',
-      description: 'Used for urgent Quick Alerts with repeating alarm sound',
-      importance: Importance.max,
-      playSound: true,
-      sound: RawResourceAndroidNotificationSound('alarm_alert'),
-      enableVibration: true,
-    );
+    try {
+      const AndroidNotificationChannel alertsChannel = AndroidNotificationChannel(
+        'alerts',
+        'High Priority Alerts & Alarms',
+        description: 'Used for urgent Quick Alerts with repeating alarm sound',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
 
-    const AndroidNotificationChannel remindersChannel = AndroidNotificationChannel(
-      'reminders',
-      'Reminders & Meetings',
-      description: 'Scheduled reminders and meetings',
-      importance: Importance.high,
-      playSound: true,
-      enableVibration: true,
-    );
+      const AndroidNotificationChannel remindersChannel = AndroidNotificationChannel(
+        'reminders',
+        'Reminders & Meetings',
+        description: 'Scheduled reminders and meetings',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      );
 
-    const AndroidNotificationChannel generalChannel = AndroidNotificationChannel(
-      'general',
-      'General Updates',
-      description: 'General tasks and updates',
-      importance: Importance.defaultImportance,
-      playSound: true,
-    );
+      const AndroidNotificationChannel generalChannel = AndroidNotificationChannel(
+        'general',
+        'General Updates',
+        description: 'General tasks and updates',
+        importance: Importance.defaultImportance,
+        playSound: true,
+      );
 
-    final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
 
-    if (androidPlugin != null) {
-      await androidPlugin.createNotificationChannel(alertsChannel);
-      await androidPlugin.createNotificationChannel(remindersChannel);
-      await androidPlugin.createNotificationChannel(generalChannel);
+      if (androidPlugin != null) {
+        await androidPlugin.createNotificationChannel(alertsChannel);
+        await androidPlugin.createNotificationChannel(remindersChannel);
+        await androidPlugin.createNotificationChannel(generalChannel);
+      }
+    } catch (e) {
+      debugPrint('Notification channel creation error: $e');
     }
 
     // 3. Setup Firebase Messaging Listeners
@@ -102,15 +105,67 @@ class NotificationService {
     _isInitialized = true;
   }
 
-  // Request Android 13+ Notification Permissions
+  // Request Android 13+ Notification Permissions (triggers native prompt)
   Future<bool> requestPermission() async {
-    final settings = await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
+    try {
+      final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      final androidGranted = await androidPlugin?.requestNotificationsPermission();
+
+      final settings = await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      return androidGranted == true ||
+          settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Trigger immediate local test notification to verify sound and channel
+  Future<void> sendTestNotification({bool isAlarm = false}) async {
+    final androidDetails = AndroidNotificationDetails(
+      isAlarm ? 'alerts' : 'general',
+      isAlarm ? 'High Priority Alerts & Alarms' : 'General Updates',
+      channelDescription: isAlarm
+          ? 'Used for urgent Quick Alerts with repeating alarm sound'
+          : 'General tasks and updates',
+      importance: isAlarm ? Importance.max : Importance.high,
+      priority: isAlarm ? Priority.max : Priority.high,
+      playSound: true,
+      sound: isAlarm ? const RawResourceAndroidNotificationSound('alarm_alert') : null,
+      enableVibration: true,
+      actions: isAlarm
+          ? const [
+              AndroidNotificationAction('action_seen', 'Seen', showsUserInterface: true),
+              AndroidNotificationAction('action_snooze', 'Snooze', showsUserInterface: false),
+            ]
+          : null,
     );
-    return settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
+
+    final details = NotificationDetails(android: androidDetails);
+    await _localNotifications.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      isAlarm ? 'CRM Alarm Alert Test' : 'CRM Notification Test',
+      isAlarm
+          ? 'Insistent high-priority alarm notification is active and working!'
+          : 'Standard notification channel is verified and active.',
+      details,
+      payload: 'quick_alert',
+    );
+  }
+
+  // Retrieve current FCM Device Token
+  Future<String?> getDeviceToken() async {
+    try {
+      return await FirebaseMessaging.instance.getToken();
+    } catch (e) {
+      debugPrint('Error getting FCM token: $e');
+      return null;
+    }
   }
 
   // Save FCM Token to crm_notifications table for current user

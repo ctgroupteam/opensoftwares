@@ -7,6 +7,7 @@ import 'core/constants.dart';
 import 'core/theme.dart';
 import 'providers/auth_provider.dart';
 import 'services/notification_service.dart';
+import 'services/update_service.dart';
 import 'views/auth/login_screen.dart';
 import 'views/main_navigation_screen.dart';
 import 'views/quick_alert/quick_alert_screen.dart';
@@ -25,10 +26,14 @@ void main() async {
   );
 
   // Initialize Supabase (with client-safe URL and anon key only)
-  await Supabase.initialize(
-    url: AppConstants.supabaseUrl,
-    anonKey: AppConstants.supabaseAnonKey,
-  );
+  try {
+    await Supabase.initialize(
+      url: AppConstants.supabaseUrl,
+      anonKey: AppConstants.supabaseAnonKey,
+    );
+  } catch (e) {
+    debugPrint('Supabase init error: $e');
+  }
 
   // Initialize Firebase Core & Push Notifications
   try {
@@ -65,6 +70,15 @@ class _OpenSoftwaresCrmAppState extends ConsumerState<OpenSoftwaresCrmApp> {
         _navigatorKey.currentState?.push(
           MaterialPageRoute(builder: (_) => const QuickAlertScreen()),
         );
+      }
+    });
+
+    // Check for GitHub updates silently in the background after launch
+    Future.delayed(const Duration(seconds: 4), () {
+      if (!mounted) return;
+      final ctx = _navigatorKey.currentContext;
+      if (ctx != null) {
+        UpdateService.instance.checkForUpdates(ctx, silent: true);
       }
     });
   }

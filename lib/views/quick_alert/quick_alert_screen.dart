@@ -330,3 +330,4 @@ class _QuickAlertScreenState extends ConsumerState<QuickAlertScreen> {
     );
   }
 }
+

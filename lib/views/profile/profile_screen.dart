@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../core/svg_icons.dart';
@@ -7,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/crm_provider.dart';
 import '../../services/notification_service.dart';
 import '../../services/supabase_service.dart';
+import '../../services/update_service.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -16,8 +18,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _notificationsAllowed = true;
-
   void _showChangePasswordDialog(BuildContext context) {
     final newPassCtrl = TextEditingController();
 
@@ -154,23 +154,126 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           // Notification Settings Card
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'System Preferences',
+                    'Device & System Settings',
                     style: TextStyle(
                       color: AppConstants.textBlack,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 12),
+
+                  // 1. Allow Notifications Native Button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Push Notification Permission',
+                              style: TextStyle(
+                                color: AppConstants.textBlack,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Enable system push notifications for urgent alerts',
+                              style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppConstants.darkBlue,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final granted = await NotificationService.instance.requestPermission();
+                          await NotificationService.instance.syncDeviceToken();
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(granted
+                                  ? 'Notification permission granted & token synchronized!'
+                                  : 'Please allow notifications in Android Settings.'),
+                              backgroundColor: granted ? AppConstants.statusSuccess : AppConstants.statusWarning,
+                            ),
+                          );
+                        },
+                        child: const Text('Allow', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 20, color: AppConstants.borderSubtle),
+
+                  // 2. Notification Diagnostic Testers
+                  const Text(
+                    'Test Notifications On Device',
+                    style: TextStyle(
+                      color: AppConstants.textBlack,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  SwitchListTile(
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.notifications_active_outlined, size: 16, color: AppConstants.statusDanger),
+                          label: const Text('Test Alarm', style: TextStyle(fontSize: 11, color: AppConstants.darkBlue)),
+                          onPressed: () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            await NotificationService.instance.sendTestNotification(isAlarm: true);
+                            if (!mounted) return;
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Insistent alarm notification triggered!'),
+                                backgroundColor: AppConstants.statusSuccess,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.notifications_outlined, size: 16, color: AppConstants.skyBlue),
+                          label: const Text('Test Normal', style: TextStyle(fontSize: 11, color: AppConstants.darkBlue)),
+                          onPressed: () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            await NotificationService.instance.sendTestNotification(isAlarm: false);
+                            if (!mounted) return;
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Standard notification triggered!'),
+                                backgroundColor: AppConstants.statusSuccess,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 20, color: AppConstants.borderSubtle),
+
+                  // 3. GitHub In-App Auto-Updater
+                  ListTile(
                     contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.system_update_alt, size: 20, color: AppConstants.skyBlue),
                     title: const Text(
-                      'Push Notifications',
+                      'Check for Updates (GitHub)',
                       style: TextStyle(
                         color: AppConstants.textBlack,
                         fontSize: 13,
@@ -178,20 +281,57 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ),
                     subtitle: const Text(
-                      'Receive urgent alarms, meeting and task updates',
+                      'Direct cloud updates via GitHub repository without rebuilding APK',
                       style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
                     ),
-                    value: _notificationsAllowed,
-                    activeColor: AppConstants.darkBlue,
-                    onChanged: (val) async {
-                      if (val) {
-                        await NotificationService.instance.requestPermission();
-                        await NotificationService.instance.syncDeviceToken();
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppConstants.skyBlue.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'v${AppConstants.appVersion}',
+                        style: TextStyle(
+                          color: AppConstants.skyBlue,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    onTap: () => UpdateService.instance.checkForUpdates(context, silent: false),
+                  ),
+                  const Divider(height: 14, color: AppConstants.borderSubtle),
+
+                  // 4. Copy FCM Device Token
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.vpn_key_outlined, size: 20, color: AppConstants.darkBlue),
+                    title: const Text(
+                      'Device FCM Push Token',
+                      style: TextStyle(
+                        color: AppConstants.textBlack,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: const Text('View and copy device registration ID for push debugging', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    trailing: const Icon(Icons.copy, size: 16, color: AppConstants.textMuted),
+                    onTap: () async {
+                      final token = await NotificationService.instance.getDeviceToken();
+                      if (token != null) {
+                        await Clipboard.setData(ClipboardData(text: token));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Device FCM Token copied to clipboard!'), backgroundColor: AppConstants.statusSuccess),
+                          );
+                        }
                       }
-                      setState(() => _notificationsAllowed = val);
                     },
                   ),
                   const Divider(height: 14, color: AppConstants.borderSubtle),
+
+                  // 5. Change Password
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.lock_reset, size: 20, color: AppConstants.darkBlue),

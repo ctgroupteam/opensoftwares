@@ -18,6 +18,9 @@ build/
 android/.gradle/
 android/local.properties
 android/app/build/
+output apk/
+*.apk
 
 # Node
 node_modules/
+
