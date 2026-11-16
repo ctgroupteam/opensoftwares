@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../core/svg_icons.dart';
 import '../providers/crm_provider.dart';
-import '../providers/team_filter_provider.dart';
 import 'drawer/crm_drawer.dart';
 import 'home/home_screen.dart';
 import 'pipeline/pipeline_screen.dart';
@@ -23,7 +22,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedTeam = ref.watch(teamFilterProvider);
     final quickAlerts = ref.watch(quickAlertsProvider);
     final activeAlertCount = quickAlerts.where((a) => a.status == 'active').length;
 
@@ -62,44 +60,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           ],
         ),
         actions: [
-          // Team Filter Pill (Gulbarga / Solapur / Both)
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(
-              color: AppConstants.backgroundLight,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppConstants.borderSubtle),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: selectedTeam,
-                borderRadius: BorderRadius.circular(12),
-                icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: AppConstants.textMuted),
-                style: const TextStyle(
-                  color: AppConstants.textBlack,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-                items: AppConstants.teams.map((t) {
-                  return DropdownMenuItem<String>(
-                    value: t,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text(t),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (newTeam) {
-                  if (newTeam != null) {
-                    ref.read(teamFilterProvider.notifier).state = newTeam;
-                  }
-                },
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-
           // Quick Alert Action Shortcut with Badge
           Stack(
             alignment: Alignment.center,
