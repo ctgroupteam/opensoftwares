@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import '../../models/crm_record.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/crm_provider.dart';
+import '../common/record_dialogs.dart';
 
 class PipelineScreen extends ConsumerStatefulWidget {
   const PipelineScreen({super.key});
@@ -16,51 +17,69 @@ class PipelineScreen extends ConsumerStatefulWidget {
 }
 
 class _PipelineScreenState extends ConsumerState<PipelineScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
+    with TickerProviderStateMixin {
+  TabController? _tabController;
+  int _lastSectionsLength = 0;
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final dynamicConfig = ref.watch(dynamicAppConfigProvider);
+    final rawSections = dynamicConfig['pipeline_sections'] as List<dynamic>?;
+    final List<String> sections = rawSections != null && rawSections.isNotEmpty
+        ? rawSections.map((e) => e.toString()).toList()
+        : ['Channel Partners', 'Follow-ups', 'Collections'];
+
+    if (_tabController == null || _lastSectionsLength != sections.length) {
+      _tabController?.dispose();
+      _tabController = TabController(length: sections.length, vsync: this);
+      _lastSectionsLength = sections.length;
+    }
+
     return GradientBackdrop(
       child: Column(
         children: [
-          // Segmented Tab Bar
+          // Segmented Scrollable Tab Bar with Add Section Action
           Container(
             color: AppConstants.pureWhite,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: AppConstants.darkBlue,
-              unselectedLabelColor: AppConstants.textMuted,
-              indicatorColor: AppConstants.darkBlue,
-              indicatorWeight: 2.5,
-              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              tabs: const [
-                Tab(text: 'Channel Partners'),
-                Tab(text: 'Follow-ups'),
-                Tab(text: 'Collections'),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    labelColor: AppConstants.darkBlue,
+                    unselectedLabelColor: AppConstants.textMuted,
+                    indicatorColor: AppConstants.darkBlue,
+                    indicatorWeight: 2.5,
+                    labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    tabs: sections.map((s) => Tab(text: s)).toList(),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, size: 20, color: AppConstants.skyBlue),
+                  tooltip: 'Add Section',
+                  onPressed: () => _showAddSectionDialog(context, sections),
+                ),
+                const SizedBox(width: 4),
               ],
             ),
           ),
           Expanded(
             child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildPartnersTab(),
-                _buildFollowupsTab(),
-                _buildCollectionsTab(),
-              ],
+              controller: _tabController!,
+              children: sections.map((sec) {
+                if (sec == 'Channel Partners') return _buildPartnersTab();
+                if (sec == 'Follow-ups') return _buildFollowupsTab();
+                if (sec == 'Collections') return _buildCollectionsTab();
+                return _buildCustomSectionTab(sec);
+              }).toList(),
             ),
           ),
         ],
@@ -113,7 +132,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
 
   Widget _buildPartnerCard(CrmRecord partner) {
     final visits = partner.visitSteps;
-    final nextVisit = partner.nextVisitDate ?? 'Not scheduled';
+    final nextVisit = partner.nextVisitDate ?? 'No visit scheduled';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -131,21 +150,6 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                     style: const TextStyle(
                       color: AppConstants.textBlack,
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppConstants.skyBlue.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    partner.team,
-                    style: const TextStyle(
-                      color: AppConstants.skyBlue,
-                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -257,37 +261,97 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 itemCount: followups.length,
                 itemBuilder: (context, index) {
-                final item = followups[index];
-                final dateStr = item.dueDate != null
-                    ? DateFormat('dd MMM yyyy').format(item.dueDate!)
-                    : 'Not set';
+                  final item = followups[index];
+                  final assigned = item.assignedPerson ?? 'Team';
+                  final changedBy = item.statusChangedBy;
+                  final dateStr = item.dueDate != null
+                      ? DateFormat('dd MMM yyyy, hh:mm a').format(item.dueDate!.toLocal())
+                      : 'Not set';
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  child: ListTile(
-                    title: Text(
-                      item.clientName ?? item.title,
-                      style: const TextStyle(
-                        color: AppConstants.textBlack,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: InkWell(
+                      onTap: () => showRecordDetail(context, item),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.clientName ?? item.title,
+                                    style: const TextStyle(
+                                      color: AppConstants.textBlack,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.more_vert, size: 18, color: AppConstants.textMuted),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => showRecordDetail(context, item),
+                                ),
+                              ],
+                            ),
+                            if (item.description != null && item.description!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                item.description!.trim(),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                StatusBadge(
+                                  status: item.status,
+                                  changedBy: changedBy,
+                                  onTap: () => showRecordDetail(context, item),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.skyBlue.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Assigned: $assigned',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppConstants.darkBlue,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(Icons.event_outlined, size: 13, color: AppConstants.textMuted),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Next Follow-up: $dateStr',
+                                  style: const TextStyle(fontSize: 11, color: AppConstants.textMuted),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    subtitle: Text(
-                      '${item.description ?? "Product Inquiry"} • Next Date: $dateStr',
-                      style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.check_circle_outline, color: AppConstants.statusSuccess),
-                      onPressed: () {
-                        final updated = item.copyWith(status: 'completed');
-                        ref.read(crmProvider.notifier).updateRecord(updated);
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
       ),
     );
   }
@@ -315,7 +379,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
                   const SizedBox(height: 80),
-                  _buildEmptyView('No collections currently recorded'),
+                  _buildEmptyView('No invoice records tracked yet'),
                 ],
               )
             : ListView.builder(
@@ -323,85 +387,227 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 itemCount: collections.length,
                 itemBuilder: (context, index) {
-                final item = collections[index];
-                final balance = item.amountDue - item.amountReceived;
-                final isPaid = balance <= 0;
+                  final item = collections[index];
+                  final balance = item.amountDue - item.amountReceived;
+                  final isPaid = balance <= 0;
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              item.clientName ?? item.title,
-                              style: const TextStyle(
-                                color: AppConstants.textBlack,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  item.clientName ?? item.title,
+                                  style: const TextStyle(
+                                    color: AppConstants.textBlack,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                               ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: isPaid
-                                    ? AppConstants.statusSuccess.withOpacity(0.12)
-                                    : AppConstants.statusWarning.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                isPaid ? 'PAID' : 'PENDING',
-                                style: TextStyle(
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
                                   color: isPaid
-                                      ? AppConstants.statusSuccess
-                                      : AppConstants.statusWarning,
-                                  fontSize: 10,
+                                      ? AppConstants.statusSuccess.withOpacity(0.12)
+                                      : AppConstants.statusWarning.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isPaid ? 'PAID' : 'PENDING',
+                                  style: TextStyle(
+                                    color: isPaid
+                                        ? AppConstants.statusSuccess
+                                        : AppConstants.statusWarning,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Due: ₹${NumberFormat('#,##,###').format(item.amountDue)}',
+                                style: const TextStyle(
+                                  color: AppConstants.textBlack,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'Received: ₹${NumberFormat('#,##,###').format(item.amountReceived)}',
+                                style: const TextStyle(
+                                  color: AppConstants.statusSuccess,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'Balance: ₹${NumberFormat('#,##,###').format(balance)}',
+                                style: const TextStyle(
+                                  color: AppConstants.statusDanger,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Due: ₹${NumberFormat('#,##,###').format(item.amountDue)}',
-                              style: const TextStyle(
-                                color: AppConstants.textBlack,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Received: ₹${NumberFormat('#,##,###').format(item.amountReceived)}',
-                              style: const TextStyle(
-                                color: AppConstants.statusSuccess,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Balance: ₹${NumberFormat('#,##,###').format(balance)}',
-                              style: const TextStyle(
-                                color: AppConstants.statusDanger,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // DYNAMIC CUSTOM SECTION TAB
+  // ------------------------------------------------------------------
+  Widget _buildCustomSectionTab(String sectionName) {
+    final allRecords = ref.watch(teamFilteredRecordsProvider);
+    final items = allRecords
+        .where((r) =>
+            r.extraData['pipeline_section'] == sectionName ||
+            r.extraData['section_name'] == sectionName)
+        .toList();
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'add_${sectionName.replaceAll(' ', '_')}_fab',
+        backgroundColor: AppConstants.darkBlue,
+        foregroundColor: AppConstants.pureWhite,
+        onPressed: () => _showAddCustomSectionItemDialog(context, sectionName),
+        icon: const AppSvgIcon(svg: AppSvgIcons.plus, size: 16, color: Colors.white),
+        label: Text('Add to $sectionName'),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(crmProvider.notifier).refresh(),
+        child: items.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  const SizedBox(height: 80),
+                  _buildEmptyView('No records in $sectionName yet'),
+                ],
+              )
+            : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final assigned = item.assignedPerson ?? 'Team';
+                  final changedBy = item.statusChangedBy;
+                  final dateStr = item.dueDate != null
+                      ? DateFormat('dd MMM yyyy, hh:mm a').format(item.dueDate!.toLocal())
+                      : null;
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: InkWell(
+                      onTap: () => showRecordDetail(context, item),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.title,
+                                    style: const TextStyle(
+                                      color: AppConstants.textBlack,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.more_vert, size: 18, color: AppConstants.textMuted),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => showRecordDetail(context, item),
+                                ),
+                              ],
+                            ),
+                            if (item.clientName != null && item.clientName!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Client: ${item.clientName}',
+                                style: const TextStyle(color: AppConstants.skyBlue, fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                            if (item.description != null && item.description!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                item.description!.trim(),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                StatusBadge(
+                                  status: item.status,
+                                  changedBy: changedBy,
+                                  onTap: () => showRecordDetail(context, item),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.skyBlue.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Assigned: $assigned',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppConstants.darkBlue,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (dateStr != null) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.event_outlined, size: 13, color: AppConstants.textMuted),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Date: $dateStr',
+                                    style: const TextStyle(fontSize: 11, color: AppConstants.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
       ),
     );
   }
@@ -429,7 +635,191 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
     );
   }
 
-  // Dialogs
+  // ------------------------------------------------------------------
+  // DIALOGS
+  // ------------------------------------------------------------------
+  void _showAddSectionDialog(BuildContext context, List<String> currentSections) {
+    final sectionNameCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Pipeline Section', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter a new pipeline section name. It will be synced across all founder devices instantly in real-time.',
+              style: TextStyle(fontSize: 12, color: AppConstants.textMuted),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: sectionNameCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Section Name (e.g. School Demos)',
+                hintText: 'Enter name',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
+            onPressed: () async {
+              final name = sectionNameCtrl.text.trim();
+              if (name.isEmpty) return;
+              if (currentSections.contains(name)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Section already exists')),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              final updated = [...currentSections, name];
+              await ref.read(crmProvider.notifier).updateAppConfigExtraData({
+                'pipeline_sections': updated,
+              });
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Section "$name" created and synced'),
+                    backgroundColor: AppConstants.statusSuccess,
+                  ),
+                );
+              }
+            },
+            child: const Text('Create Section'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddCustomSectionItemDialog(BuildContext context, String sectionName) {
+    final titleCtrl = TextEditingController();
+    final clientCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    final manualAssignedCtrl = TextEditingController();
+    String selectedFounder = kFounderNames.first;
+    String status = 'pending';
+    String team = 'Gulbarga';
+    DateTime? dueDate = DateTime.now().add(const Duration(days: 3));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Add to $sectionName', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Title / Item Name *')),
+                const SizedBox(height: 10),
+                TextField(controller: clientCtrl, decoration: const InputDecoration(labelText: 'Client / Organization')),
+                const SizedBox(height: 10),
+                TextField(controller: notesCtrl, decoration: const InputDecoration(labelText: 'Details / Notes')),
+                const SizedBox(height: 12),
+
+                // Assigned Person
+                DropdownButtonFormField<String>(
+                  value: selectedFounder,
+                  decoration: const InputDecoration(labelText: 'Assigned Person'),
+                  items: kFounderNames.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
+                  onChanged: (v) => setDialogState(() => selectedFounder = v!),
+                ),
+                if (selectedFounder == 'Other (Enter Manually)') ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: manualAssignedCtrl,
+                    decoration: const InputDecoration(labelText: 'Enter Assignee Name *'),
+                  ),
+                ],
+                const SizedBox(height: 10),
+
+                // Initial Status
+                DropdownButtonFormField<String>(
+                  value: status,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: kRecordStatuses.map((st) {
+                    final color = getStatusColor(st);
+                    return DropdownMenuItem(
+                      value: st,
+                      child: Text(formatStatus(st), style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+                    );
+                  }).toList(),
+                  onChanged: (v) => setDialogState(() => status = v!),
+                ),
+                const SizedBox(height: 10),
+
+                // Territory Team
+                DropdownButtonFormField<String>(
+                  value: team,
+                  decoration: const InputDecoration(labelText: 'Team'),
+                  items: const [
+                    DropdownMenuItem(value: 'Gulbarga', child: Text('Gulbarga')),
+                    DropdownMenuItem(value: 'Solapur', child: Text('Solapur')),
+                    DropdownMenuItem(value: 'Both', child: Text('Both')),
+                  ],
+                  onChanged: (v) => setDialogState(() => team = v!),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
+              onPressed: () {
+                if (titleCtrl.text.trim().isEmpty) return;
+                final assignedName = selectedFounder == 'Other (Enter Manually)'
+                    ? manualAssignedCtrl.text.trim()
+                    : selectedFounder;
+
+                final currentUser = ref.read(authProvider).profile;
+                final creatorName = (currentUser != null && currentUser.name.trim().isNotEmpty)
+                    ? currentUser.name.trim()
+                    : 'Yahya Mundewadi';
+
+                Navigator.pop(ctx);
+                final rec = CrmRecord(
+                  id: '',
+                  entityType: 'lead',
+                  title: titleCtrl.text.trim(),
+                  clientName: clientCtrl.text.trim(),
+                  description: notesCtrl.text.trim(),
+                  team: team,
+                  status: status,
+                  assignedTo: assignedName,
+                  dueDate: dueDate,
+                  extraData: {
+                    'pipeline_section': sectionName,
+                    'assigned_to': assignedName,
+                    'status_changed_by': creatorName,
+                    'status_changed_at': DateTime.now().toIso8601String(),
+                  },
+                );
+                ref.read(crmProvider.notifier).addRecord(rec);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Item added to $sectionName'),
+                    backgroundColor: AppConstants.statusSuccess,
+                  ),
+                );
+              },
+              child: const Text('Add Item'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showAddPartnerDialog(BuildContext context) {
     final nameCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
@@ -462,6 +852,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
               onPressed: () {
                 if (nameCtrl.text.trim().isEmpty) return;
                 Navigator.pop(ctx);
@@ -502,6 +893,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
             onPressed: () {
               if (stepCtrl.text.trim().isEmpty) return;
               Navigator.pop(ctx);
@@ -525,38 +917,155 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
   void _showAddFollowupDialog(BuildContext context) {
     final clientCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
+    final manualAssignedCtrl = TextEditingController();
+    String selectedFounder = kFounderNames.first;
+    String status = 'pending';
+    DateTime? dueDate = DateTime.now().add(const Duration(days: 2));
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Client Follow-up', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: clientCtrl, decoration: const InputDecoration(labelText: 'Client / School Name')),
-            const SizedBox(height: 10),
-            TextField(controller: notesCtrl, decoration: const InputDecoration(labelText: 'Follow-up Notes')),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Add Client Follow-up', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(controller: clientCtrl, decoration: const InputDecoration(labelText: 'Client / School Name *')),
+                const SizedBox(height: 10),
+                TextField(controller: notesCtrl, decoration: const InputDecoration(labelText: 'Follow-up Notes')),
+                const SizedBox(height: 12),
+
+                // Assigned Person Dropdown
+                DropdownButtonFormField<String>(
+                  value: selectedFounder,
+                  decoration: const InputDecoration(labelText: 'Assigned Person'),
+                  items: kFounderNames.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
+                  onChanged: (v) => setDialogState(() => selectedFounder = v!),
+                ),
+                if (selectedFounder == 'Other (Enter Manually)') ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: manualAssignedCtrl,
+                    decoration: const InputDecoration(labelText: 'Enter Assignee Name *'),
+                  ),
+                ],
+                const SizedBox(height: 10),
+
+                // Initial Status
+                DropdownButtonFormField<String>(
+                  value: status,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: kRecordStatuses.map((st) {
+                    final color = getStatusColor(st);
+                    return DropdownMenuItem(
+                      value: st,
+                      child: Text(formatStatus(st), style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+                    );
+                  }).toList(),
+                  onChanged: (v) => setDialogState(() => status = v!),
+                ),
+                const SizedBox(height: 10),
+
+                // Due Date Picker Button
+                InkWell(
+                  onTap: () async {
+                    final now = DateTime.now();
+                    final pickedDate = await showDatePicker(
+                      context: ctx,
+                      initialDate: dueDate ?? now.add(const Duration(days: 1)),
+                      firstDate: now,
+                      lastDate: now.add(const Duration(days: 365)),
+                    );
+                    if (pickedDate != null && ctx.mounted) {
+                      final pickedTime = await showTimePicker(
+                        context: ctx,
+                        initialTime: TimeOfDay.fromDateTime(dueDate ?? now.add(const Duration(hours: 4))),
+                      );
+                      if (pickedTime != null) {
+                        setDialogState(() {
+                          dueDate = DateTime(
+                            pickedDate.year,
+                            pickedDate.month,
+                            pickedDate.day,
+                            pickedTime.hour,
+                            pickedTime.minute,
+                          );
+                        });
+                      }
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppConstants.borderSubtle),
+                      borderRadius: BorderRadius.circular(8),
+                      color: AppConstants.backgroundLight,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_month_outlined, size: 18, color: AppConstants.skyBlue),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            dueDate != null
+                                ? 'Next Date: ${DateFormat("dd MMM yyyy, hh:mm a").format(dueDate!)}'
+                                : 'Choose Date & Time',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
+              onPressed: () {
+                if (clientCtrl.text.trim().isEmpty) return;
+                final assignedName = selectedFounder == 'Other (Enter Manually)'
+                    ? manualAssignedCtrl.text.trim()
+                    : selectedFounder;
+
+                final currentUser = ref.read(authProvider).profile;
+                final creatorName = (currentUser != null && currentUser.name.trim().isNotEmpty)
+                    ? currentUser.name.trim()
+                    : 'Yahya Mundewadi';
+
+                Navigator.pop(ctx);
+                final rec = CrmRecord(
+                  id: '',
+                  entityType: 'followup',
+                  title: 'Follow-up: ${clientCtrl.text.trim()}',
+                  clientName: clientCtrl.text.trim(),
+                  description: notesCtrl.text.trim(),
+                  dueDate: dueDate,
+                  status: status,
+                  assignedTo: assignedName,
+                  extraData: {
+                    'assigned_to': assignedName,
+                    'status_changed_by': creatorName,
+                    'status_changed_at': DateTime.now().toIso8601String(),
+                  },
+                );
+                ref.read(crmProvider.notifier).addRecord(rec);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Follow-up scheduled and assigned to $assignedName'),
+                    backgroundColor: AppConstants.statusSuccess,
+                  ),
+                );
+              },
+              child: const Text('Schedule'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              if (clientCtrl.text.trim().isEmpty) return;
-              Navigator.pop(ctx);
-              final rec = CrmRecord(
-                id: '',
-                entityType: 'followup',
-                title: 'Follow-up: ${clientCtrl.text.trim()}',
-                clientName: clientCtrl.text.trim(),
-                description: notesCtrl.text.trim(),
-                dueDate: DateTime.now().add(const Duration(days: 2)),
-              );
-              ref.read(crmProvider.notifier).addRecord(rec);
-            },
-            child: const Text('Schedule'),
-          ),
-        ],
       ),
     );
   }
@@ -583,6 +1092,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
             onPressed: () {
               if (clientCtrl.text.trim().isEmpty) return;
               Navigator.pop(ctx);
@@ -604,4 +1114,3 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
     );
   }
 }
-

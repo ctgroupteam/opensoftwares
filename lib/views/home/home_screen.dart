@@ -8,6 +8,7 @@ import '../../models/crm_record.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/crm_provider.dart';
 import '../../services/notification_service.dart';
+import '../common/record_dialogs.dart';
 
 class HomeScreen extends ConsumerWidget {
   final Function(int)? onNavigateTab;
@@ -464,34 +465,149 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildTaskItem(BuildContext context, WidgetRef ref, CrmRecord task) {
     final isDone = task.status == 'done' || task.status == 'completed';
+    final assigned = task.assignedPerson ?? 'Team';
+    final changedBy = task.statusChangedBy;
+    final dueDateStr = task.dueDate != null
+        ? DateFormat('dd MMM, hh:mm a').format(task.dueDate!.toLocal())
+        : null;
+    final isOverdue = task.dueDate != null &&
+        task.dueDate!.isBefore(DateTime.now()) &&
+        !isDone;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        leading: Checkbox(
-          value: isDone,
-          activeColor: AppConstants.darkBlue,
-          onChanged: (val) {
-            final updated = task.copyWith(status: val == true ? 'done' : 'pending');
-            ref.read(crmProvider.notifier).updateRecord(updated);
-          },
-        ),
-        title: Text(
-          task.title,
-          style: TextStyle(
-            color: AppConstants.textBlack,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            decoration: isDone ? TextDecoration.lineThrough : null,
+      child: InkWell(
+        onTap: () => showRecordDetail(context, task),
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Checkbox(
+                    value: isDone,
+                    activeColor: AppConstants.darkBlue,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    onChanged: (val) {
+                      final currentUser = ref.read(authProvider).profile;
+                      final changerName = (currentUser != null && currentUser.name.trim().isNotEmpty)
+                          ? currentUser.name.trim()
+                          : 'Yahya Mundewadi';
+                      final extra = Map<String, dynamic>.from(task.extraData);
+                      extra['status_changed_by'] = changerName;
+                      extra['status_changed_at'] = DateTime.now().toIso8601String();
+                      final updated = task.copyWith(
+                        status: val == true ? 'done' : 'pending',
+                        extraData: extra,
+                      );
+                      ref.read(crmProvider.notifier).updateRecord(updated);
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          task.title,
+                          style: TextStyle(
+                            color: AppConstants.textBlack,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            decoration: isDone ? TextDecoration.lineThrough : null,
+                          ),
+                        ),
+                        if (task.description != null && task.description!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            task.description!.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.more_vert, size: 18, color: AppConstants.textMuted),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => showRecordDetail(context, task),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  StatusBadge(
+                    status: task.status,
+                    changedBy: changedBy,
+                    onTap: () => showRecordDetail(context, task),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppConstants.skyBlue.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Assigned: $assigned',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppConstants.darkBlue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (dueDateStr != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.schedule,
+                      size: 13,
+                      color: isOverdue ? AppConstants.statusDanger : AppConstants.textMuted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Deadline: $dueDateStr',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: isOverdue ? FontWeight.w700 : FontWeight.w500,
+                        color: isOverdue ? AppConstants.statusDanger : AppConstants.textMuted,
+                      ),
+                    ),
+                    if (isOverdue) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppConstants.statusDanger.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Text(
+                          'OVERDUE',
+                          style: TextStyle(
+                            color: AppConstants.statusDanger,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ],
           ),
-        ),
-        subtitle: Text(
-          'Priority: ${task.priority.toUpperCase()} • Team: ${task.team}',
-          style: const TextStyle(color: AppConstants.textMuted, fontSize: 11),
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, size: 18, color: AppConstants.textMuted),
-          onPressed: () => ref.read(crmProvider.notifier).deleteRecord(task.id),
         ),
       ),
     );
@@ -516,8 +632,12 @@ class HomeScreen extends ConsumerWidget {
   void _showAddTaskDialog(BuildContext context, WidgetRef ref) {
     final titleCtrl = TextEditingController();
     final descCtrl = TextEditingController();
+    final manualAssignedCtrl = TextEditingController();
     String priority = 'normal';
     String team = 'Gulbarga';
+    String status = 'pending';
+    String selectedFounder = kFounderNames.first;
+    DateTime? deadline;
 
     showDialog(
       context: context,
@@ -527,38 +647,142 @@ class HomeScreen extends ConsumerWidget {
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
                   controller: titleCtrl,
-                  decoration: const InputDecoration(labelText: 'Task Title'),
+                  decoration: const InputDecoration(labelText: 'Task Title *'),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: descCtrl,
-                  decoration: const InputDecoration(labelText: 'Description'),
+                  decoration: const InputDecoration(labelText: 'Description / Notes'),
+                ),
+                const SizedBox(height: 12),
+
+                // Assigned Person Dropdown
+                DropdownButtonFormField<String>(
+                  value: selectedFounder,
+                  decoration: const InputDecoration(labelText: 'Assigned Person'),
+                  items: kFounderNames.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
+                  onChanged: (v) => setDialogState(() => selectedFounder = v!),
+                ),
+                if (selectedFounder == 'Other (Enter Manually)') ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: manualAssignedCtrl,
+                    decoration: const InputDecoration(labelText: 'Enter Assignee Name *'),
+                  ),
+                ],
+                const SizedBox(height: 10),
+
+                // Initial Status
+                DropdownButtonFormField<String>(
+                  value: status,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: kRecordStatuses.map((st) {
+                    final color = getStatusColor(st);
+                    return DropdownMenuItem(
+                      value: st,
+                      child: Text(formatStatus(st), style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+                    );
+                  }).toList(),
+                  onChanged: (v) => setDialogState(() => status = v!),
                 ),
                 const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: priority,
-                  decoration: const InputDecoration(labelText: 'Priority'),
-                  items: const [
-                    DropdownMenuItem(value: 'low', child: Text('Low')),
-                    DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                    DropdownMenuItem(value: 'high', child: Text('High')),
-                    DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
-                  ],
-                  onChanged: (v) => setDialogState(() => priority = v!),
+
+                // Deadline Picker Button
+                InkWell(
+                  onTap: () async {
+                    final now = DateTime.now();
+                    final pickedDate = await showDatePicker(
+                      context: ctx,
+                      initialDate: deadline ?? now.add(const Duration(days: 1)),
+                      firstDate: now,
+                      lastDate: now.add(const Duration(days: 365)),
+                    );
+                    if (pickedDate != null && ctx.mounted) {
+                      final pickedTime = await showTimePicker(
+                        context: ctx,
+                        initialTime: TimeOfDay.fromDateTime(deadline ?? now.add(const Duration(hours: 4))),
+                      );
+                      if (pickedTime != null) {
+                        setDialogState(() {
+                          deadline = DateTime(
+                            pickedDate.year,
+                            pickedDate.month,
+                            pickedDate.day,
+                            pickedTime.hour,
+                            pickedTime.minute,
+                          );
+                        });
+                      }
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppConstants.borderSubtle),
+                      borderRadius: BorderRadius.circular(8),
+                      color: AppConstants.backgroundLight,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_month_outlined, size: 18, color: AppConstants.skyBlue),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            deadline != null
+                                ? 'Deadline: ${DateFormat("dd MMM yyyy, hh:mm a").format(deadline!)}'
+                                : 'Choose Deadline Date & Time',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: deadline != null ? FontWeight.w700 : FontWeight.w500,
+                              color: deadline != null ? AppConstants.textBlack : AppConstants.textMuted,
+                            ),
+                          ),
+                        ),
+                        if (deadline != null)
+                          GestureDetector(
+                            onTap: () => setDialogState(() => deadline = null),
+                            child: const Icon(Icons.clear, size: 16, color: AppConstants.textMuted),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: team,
-                  decoration: const InputDecoration(labelText: 'Team'),
-                  items: const [
-                    DropdownMenuItem(value: 'Gulbarga', child: Text('Gulbarga')),
-                    DropdownMenuItem(value: 'Solapur', child: Text('Solapur')),
-                    DropdownMenuItem(value: 'Both', child: Text('Both')),
+
+                // Priority & Team
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: priority,
+                        decoration: const InputDecoration(labelText: 'Priority'),
+                        items: const [
+                          DropdownMenuItem(value: 'low', child: Text('Low')),
+                          DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                          DropdownMenuItem(value: 'high', child: Text('High')),
+                          DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
+                        ],
+                        onChanged: (v) => setDialogState(() => priority = v!),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: team,
+                        decoration: const InputDecoration(labelText: 'Team'),
+                        items: const [
+                          DropdownMenuItem(value: 'Gulbarga', child: Text('Gulbarga')),
+                          DropdownMenuItem(value: 'Solapur', child: Text('Solapur')),
+                          DropdownMenuItem(value: 'Both', child: Text('Both')),
+                        ],
+                        onChanged: (v) => setDialogState(() => team = v!),
+                      ),
+                    ),
                   ],
-                  onChanged: (v) => setDialogState(() => team = v!),
                 ),
               ],
             ),
@@ -569,8 +793,18 @@ class HomeScreen extends ConsumerWidget {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
               onPressed: () {
                 if (titleCtrl.text.trim().isEmpty) return;
+                final assignedName = selectedFounder == 'Other (Enter Manually)'
+                    ? manualAssignedCtrl.text.trim()
+                    : selectedFounder;
+
+                final currentUser = ref.read(authProvider).profile;
+                final creatorName = (currentUser != null && currentUser.name.trim().isNotEmpty)
+                    ? currentUser.name.trim()
+                    : 'Yahya Mundewadi';
+
                 Navigator.pop(ctx);
                 final task = CrmRecord(
                   id: '',
@@ -579,9 +813,25 @@ class HomeScreen extends ConsumerWidget {
                   description: descCtrl.text.trim(),
                   priority: priority,
                   team: team,
-                  status: 'pending',
+                  status: status,
+                  assignedTo: assignedName,
+                  dueDate: deadline,
+                  extraData: {
+                    'assigned_to': assignedName,
+                    'status_changed_by': creatorName,
+                    'status_changed_at': DateTime.now().toIso8601String(),
+                    if (deadline != null) 'deadline': deadline!.toIso8601String(),
+                  },
                 );
                 ref.read(crmProvider.notifier).addRecord(task);
+
+                // Show confirmation
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Task added and assigned to $assignedName'),
+                    backgroundColor: AppConstants.statusSuccess,
+                  ),
+                );
               },
               child: const Text('Add Task'),
             ),

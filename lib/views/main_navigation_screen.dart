@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../core/svg_icons.dart';
 import '../providers/crm_provider.dart';
+import '../services/update_service.dart';
 import 'drawer/crm_drawer.dart';
 import 'home/home_screen.dart';
 import 'pipeline/pipeline_screen.dart';
@@ -21,6 +22,14 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentTabIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService.instance.checkForUpdates(context, silent: true);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final quickAlerts = ref.watch(quickAlertsProvider);
     final activeAlertCount = quickAlerts.where((a) => a.status == 'active').length;
@@ -34,7 +43,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
       const ProfileScreen(),
     ];
 
-    return Scaffold(
+    return PopScope(
+      canPop: _currentTabIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentTabIndex != 0) {
+          setState(() => _currentTabIndex = 0);
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
         title: Row(
@@ -173,7 +190,8 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 

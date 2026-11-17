@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
 
@@ -15,6 +16,30 @@ class UpdateService {
     _isChecking = true;
 
     try {
+      // 1. Fast check via Supabase Config (Instant WebSocket/DB)
+      try {
+        final client = Supabase.instance.client;
+        final res = await client
+            .from('crm_records')
+            .select('extra_data')
+            .eq('title', '[APP_CONFIG]')
+            .maybeSingle();
+
+        if (res != null && res['extra_data'] is Map) {
+          final extra = res['extra_data'] as Map<String, dynamic>;
+          final remoteVer = (extra['latest_version']?.toString() ?? '').replaceAll('v', '').trim();
+          final remoteApkUrl = extra['apk_download_url']?.toString();
+          final currentVersion = AppConstants.appVersion.replaceAll('v', '').trim();
+
+          if (remoteVer.isNotEmpty && remoteApkUrl != null && _isNewerVersion(currentVersion, remoteVer) && context.mounted) {
+            _showUpdateDialog(context, remoteVer, extra['release_notes']?.toString() ?? 'Latest performance & feature updates.', remoteApkUrl);
+            _isChecking = false;
+            return;
+          }
+        }
+      } catch (_) {}
+
+      // 2. Direct GitHub Releases API Check
       final uri = Uri.parse('https://api.github.com/repos/${AppConstants.githubRepo}/releases/latest');
       final response = await http.get(
         uri,

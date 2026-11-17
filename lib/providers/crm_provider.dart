@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/crm_record.dart';
 import '../services/offline_cache_service.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 
 class CrmState {
   final List<CrmRecord> records;
@@ -59,6 +60,8 @@ class CrmNotifier extends StateNotifier<CrmState> {
     try {
       final fresh = await SupabaseService.instance.fetchRecords();
       state = CrmState(records: fresh, isLoading: false);
+      final tasks = fresh.where((r) => r.entityType == 'task').toList();
+      NotificationService.instance.checkTaskDeadlines(tasks);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -93,6 +96,17 @@ class CrmNotifier extends StateNotifier<CrmState> {
       state = state.copyWith(records: updatedList);
     } catch (e) {
       state = state.copyWith(error: e.toString());
+    }
+  }
+
+  Future<void> updateAppConfigExtraData(Map<String, dynamic> newFields) async {
+    for (final r in state.records) {
+      if (r.title == '[APP_CONFIG]' || r.extraData['is_app_config'] == true) {
+        final merged = Map<String, dynamic>.from(r.extraData)..addAll(newFields);
+        final updated = r.copyWith(extraData: merged);
+        await updateRecord(updated);
+        return;
+      }
     }
   }
 

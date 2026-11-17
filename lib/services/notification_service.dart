@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
+import '../models/crm_record.dart';
 
 // Top-level entry point for background FCM messages
 @pragma('vm:entry-point')
@@ -204,6 +206,51 @@ class NotificationService {
       overrideSound: soundKey,
       payload: 'home',
     );
+  }
+
+  // Check and alert on tasks that are overdue or due within 24 hours
+  Future<void> checkTaskDeadlines(List<CrmRecord> tasks) async {
+    final now = DateTime.now();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      for (final task in tasks) {
+        if (task.dueDate == null) continue;
+        final isDone = task.status == 'done' || task.status == 'completed';
+        if (isDone) continue;
+
+        final deadline = task.dueDate!;
+        final diff = deadline.difference(now);
+        final assigned = task.assignedPerson ?? 'Team';
+
+        // 1. Task Overdue Alert
+        if (diff.isNegative) {
+          final alertKey = 'alert_overdue_${task.id}';
+          final alreadySent = prefs.getBool(alertKey) ?? false;
+          if (!alreadySent) {
+            await prefs.setBool(alertKey, true);
+            await showHeadsUpNotification(
+              title: 'Deadline Passed: ${task.title}',
+              body: 'Task assigned to $assigned has exceeded its deadline (${DateFormat("dd MMM, hh:mm a").format(deadline.toLocal())}).',
+              overrideSound: 'sound_task',
+            );
+          }
+        }
+        // 2. Task 24-Hour Notice Alert
+        else if (diff.inHours <= 24 && diff.inHours >= 0) {
+          final alertKey = 'alert_24h_${task.id}';
+          final alreadySent = prefs.getBool(alertKey) ?? false;
+          if (!alreadySent) {
+            await prefs.setBool(alertKey, true);
+            await showHeadsUpNotification(
+              title: 'Deadline Tomorrow: ${task.title}',
+              body: 'Task assigned to $assigned is due in ${diff.inHours} hours (${DateFormat("dd MMM, hh:mm a").format(deadline.toLocal())}).',
+              overrideSound: 'sound_reminder',
+            );
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   // Save FCM Token to crm_notifications table for current user

@@ -1,0 +1,422 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import '../../core/constants.dart';
+import '../../models/crm_record.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/crm_provider.dart';
+
+const List<String> kFounderNames = [
+  'Yahya Mundewadi (Admin Founder)',
+  'Founder 2',
+  'Founder 3',
+  'Founder 4',
+  'Other (Enter Manually)',
+];
+
+const List<String> kRecordStatuses = [
+  'pending',
+  'work started',
+  'done',
+  'completed',
+];
+
+Color getStatusColor(String status) {
+  final s = status.toLowerCase().trim();
+  switch (s) {
+    case 'work started':
+    case 'work_started':
+    case 'in_progress':
+      return AppConstants.skyBlue;
+    case 'done':
+    case 'completed':
+      return AppConstants.statusSuccess;
+    case 'urgent':
+      return AppConstants.statusDanger;
+    case 'pending':
+    default:
+      return AppConstants.statusWarning;
+  }
+}
+
+String formatStatus(String status) {
+  final s = status.toLowerCase().trim();
+  if (s == 'work_started' || s == 'work started') return 'Work Started';
+  if (s == 'done') return 'Done';
+  if (s == 'completed') return 'Completed';
+  return 'Pending';
+}
+
+class StatusBadge extends StatelessWidget {
+  final String status;
+  final String? changedBy;
+  final VoidCallback? onTap;
+
+  const StatusBadge({
+    super.key,
+    required this.status,
+    this.changedBy,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = getStatusColor(status);
+    final label = formatStatus(status);
+
+    Widget badge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (changedBy != null && changedBy!.trim().isNotEmpty) ...[
+            const SizedBox(width: 5),
+            Text(
+              '• by ${changedBy!.trim()}',
+              style: const TextStyle(
+                color: AppConstants.textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: badge,
+      );
+    }
+    return badge;
+  }
+}
+
+class RecordDetailDialog extends ConsumerStatefulWidget {
+  final CrmRecord record;
+  const RecordDetailDialog({super.key, required this.record});
+
+  @override
+  ConsumerState<RecordDetailDialog> createState() => _RecordDetailDialogState();
+}
+
+class _RecordDetailDialogState extends ConsumerState<RecordDetailDialog> {
+  late String _currentStatus;
+  bool _isUpdating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStatus = widget.record.status.toLowerCase().trim();
+    if (!kRecordStatuses.contains(_currentStatus)) {
+      _currentStatus = 'pending';
+    }
+  }
+
+  Future<void> _updateStatus(String newStatus) async {
+    if (_isUpdating) return;
+    setState(() => _isUpdating = true);
+
+    final currentUser = ref.read(authProvider).profile;
+    final changerName = (currentUser != null && currentUser.name.trim().isNotEmpty)
+        ? currentUser.name.trim()
+        : 'Yahya Mundewadi';
+
+    final extra = Map<String, dynamic>.from(widget.record.extraData);
+    extra['status_changed_by'] = changerName;
+    extra['status_changed_at'] = DateTime.now().toIso8601String();
+
+    final updated = widget.record.copyWith(
+      status: newStatus,
+      extraData: extra,
+    );
+
+    await ref.read(crmProvider.notifier).updateRecord(updated);
+
+    if (mounted) {
+      setState(() {
+        _currentStatus = newStatus;
+        _isUpdating = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Status updated to "${formatStatus(newStatus)}" by $changerName'),
+          backgroundColor: AppConstants.statusSuccess,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.record;
+    final assigned = r.assignedPerson ?? 'Unassigned';
+    final changedBy = r.statusChangedBy;
+    final changedAt = r.statusChangedAt != null
+        ? DateFormat('dd MMM, hh:mm a').format(DateTime.tryParse(r.statusChangedAt!)?.toLocal() ?? DateTime.now())
+        : null;
+    final dateStr = r.dueDate != null
+        ? DateFormat('dd MMM yyyy, hh:mm a').format(r.dueDate!.toLocal())
+        : 'Not specified';
+
+    final isDeadlineOverdue = r.dueDate != null &&
+        r.dueDate!.isBefore(DateTime.now()) &&
+        _currentStatus != 'done' &&
+        _currentStatus != 'completed';
+
+    return AlertDialog(
+      titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      title: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  r.title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppConstants.textBlack,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${r.entityType.toUpperCase()} • Team: ${r.team}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppConstants.skyBlue,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Divider(color: AppConstants.borderSubtle),
+            const SizedBox(height: 8),
+
+            // Force Status Change Section
+            const Text(
+              'Change Status:',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppConstants.textBlack,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppConstants.backgroundLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppConstants.borderSubtle),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _currentStatus,
+                  isExpanded: true,
+                  items: kRecordStatuses.map((st) {
+                    final color = getStatusColor(st);
+                    return DropdownMenuItem(
+                      value: st,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            formatStatus(st),
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (newVal) {
+                    if (newVal != null && newVal != _currentStatus) {
+                      _updateStatus(newVal);
+                    }
+                  },
+                ),
+              ),
+            ),
+
+            if (changedBy != null && changedBy.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.person_pin_outlined, size: 14, color: AppConstants.textMuted),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Last changed by $changedBy${changedAt != null ? " ($changedAt)" : ""}',
+                      style: const TextStyle(fontSize: 11, color: AppConstants.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            const SizedBox(height: 14),
+            const Divider(color: AppConstants.borderSubtle),
+            const SizedBox(height: 8),
+
+            // Assigned Person
+            _buildInfoRow(
+              Icons.account_circle_outlined,
+              'Assigned Person',
+              assigned,
+            ),
+            const SizedBox(height: 10),
+
+            // Deadline / Due Date
+            _buildInfoRow(
+              Icons.event_outlined,
+              'Deadline / Due Date',
+              dateStr,
+              trailing: isDeadlineOverdue
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppConstants.statusDanger.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'OVERDUE',
+                        style: TextStyle(
+                          color: AppConstants.statusDanger,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 10),
+
+            // Description / Notes
+            if (r.description != null && r.description!.trim().isNotEmpty) ...[
+              _buildInfoRow(
+                Icons.notes_outlined,
+                'Description & Notes',
+                r.description!.trim(),
+              ),
+              const SizedBox(height: 10),
+            ],
+
+            // Priority
+            _buildInfoRow(
+              Icons.flag_outlined,
+              'Priority',
+              r.priority.toUpperCase(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton.icon(
+          icon: const Icon(Icons.delete_outline, size: 16, color: AppConstants.statusDanger),
+          label: const Text('Delete', style: TextStyle(color: AppConstants.statusDanger)),
+          onPressed: () {
+            Navigator.pop(context);
+            ref.read(crmProvider.notifier).deleteRecord(r.id);
+          },
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value, {Widget? trailing}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: AppConstants.skyBlue),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppConstants.textMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppConstants.textBlack,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) trailing,
+      ],
+    );
+  }
+}
+
+void showRecordDetail(BuildContext context, CrmRecord record) {
+  showDialog(
+    context: context,
+    builder: (_) => RecordDetailDialog(record: record),
+  );
+}
+
