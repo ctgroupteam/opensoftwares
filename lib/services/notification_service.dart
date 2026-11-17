@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -46,6 +47,18 @@ class NotificationService {
       return prefs.getString(_prefSoundKey) ?? defaultSound;
     } catch (_) {
       return defaultSound;
+    }
+  }
+
+  static const MethodChannel _audioChannel =
+      MethodChannel('com.opensoftwares.crm/audio');
+
+  // Play audio file directly through device speaker without displaying any notification
+  Future<void> playSoundDirectly(String soundName) async {
+    try {
+      await _audioChannel.invokeMethod('playSound', {'sound': soundName});
+    } catch (e) {
+      debugPrint('Direct audio playback error: $e');
     }
   }
 

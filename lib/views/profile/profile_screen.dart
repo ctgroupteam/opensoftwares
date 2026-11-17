@@ -66,6 +66,130 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  void _showSoundPickerModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppConstants.pureWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Select Notification Sound',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppConstants.textBlack,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20, color: AppConstants.textMuted),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const Text(
+                  'Tap any tone to test sound directly through speaker without notification popup.',
+                  style: TextStyle(fontSize: 11, color: AppConstants.textMuted),
+                ),
+                const SizedBox(height: 14),
+                ...NotificationService.availableSounds.entries.map((entry) {
+                  final isSelected = _selectedSound == entry.key;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppConstants.skyBlue.withOpacity(0.08)
+                          : AppConstants.backgroundLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? AppConstants.skyBlue : AppConstants.borderSubtle,
+                      ),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                      leading: IconButton(
+                        icon: const Icon(Icons.play_circle_fill, color: AppConstants.skyBlue, size: 28),
+                        onPressed: () async {
+                          // Play sound directly through speaker without showing notification
+                          await NotificationService.instance.playSoundDirectly(entry.key);
+                        },
+                      ),
+                      title: Text(
+                        entry.value,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? AppConstants.darkBlue : AppConstants.textBlack,
+                        ),
+                      ),
+                      trailing: isSelected
+                          ? const Icon(Icons.check_circle, color: AppConstants.statusSuccess, size: 22)
+                          : OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                minimumSize: const Size(55, 28),
+                                side: const BorderSide(color: AppConstants.skyBlue),
+                              ),
+                              onPressed: () async {
+                                final messenger = ScaffoldMessenger.of(context);
+                                setModalState(() {});
+                                setState(() => _selectedSound = entry.key);
+                                await NotificationService.instance.setSelectedSound(entry.key);
+                                await NotificationService.instance.playSoundDirectly(entry.key);
+                                if (mounted) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text('Notification sound set to ${entry.value}'),
+                                      backgroundColor: AppConstants.statusSuccess,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                                if (ctx.mounted) {
+                                  Navigator.pop(ctx);
+                                }
+                              },
+                              child: const Text('Select', style: TextStyle(fontSize: 11, color: AppConstants.skyBlue)),
+                            ),
+                      onTap: () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        setModalState(() {});
+                        setState(() => _selectedSound = entry.key);
+                        await NotificationService.instance.setSelectedSound(entry.key);
+                        await NotificationService.instance.playSoundDirectly(entry.key);
+                        if (mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Notification sound set to ${entry.value}'),
+                              backgroundColor: AppConstants.statusSuccess,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  );
+                }),
+                const SizedBox(height: 10),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -230,109 +354,94 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const Divider(height: 20, color: AppConstants.borderSubtle),
 
-                  // 2. Notification Sound Selection (Unified Sound with 5 choices)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Notification Sound',
-                        style: TextStyle(
-                          color: AppConstants.textBlack,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppConstants.skyBlue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          NotificationService.availableSounds[_selectedSound] ?? 'Reminder Chime',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppConstants.darkBlue,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Select the sound to play for all notifications in the app (default: Reminder Chime)',
-                    style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
-                  ),
-                  const SizedBox(height: 10),
-                  ...NotificationService.availableSounds.entries.map((entry) {
-                    final isSelected = _selectedSound == entry.key;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppConstants.skyBlue.withOpacity(0.08) : AppConstants.backgroundLight,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isSelected ? AppConstants.skyBlue : AppConstants.borderSubtle,
-                        ),
-                      ),
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                        leading: Radio<String>(
-                          value: entry.key,
-                          groupValue: _selectedSound,
-                          activeColor: AppConstants.darkBlue,
-                          onChanged: (val) async {
-                            if (val == null) return;
-                            setState(() => _selectedSound = val);
-                            await NotificationService.instance.setSelectedSound(val);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Notification sound set to ${entry.value}'),
-                                  backgroundColor: AppConstants.statusSuccess,
-                                  duration: const Duration(seconds: 2),
+                  // 2. Notification Sound Selection (Compact Dropdown / Modal)
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppConstants.backgroundLight,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppConstants.borderSubtle),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.music_note_rounded, size: 20, color: AppConstants.darkBlue),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Notification Sound',
+                                  style: TextStyle(
+                                    color: AppConstants.textBlack,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              );
-                            }
-                          },
-                        ),
-                        title: Text(
-                          entry.value,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                            color: isSelected ? AppConstants.darkBlue : AppConstants.textBlack,
-                          ),
-                        ),
-                        trailing: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            minimumSize: const Size(50, 28),
-                            side: const BorderSide(color: AppConstants.skyBlue),
-                          ),
-                          onPressed: () async {
-                            await NotificationService.instance.sendTestNotification(entry.key);
-                          },
-                          child: const Text('Test', style: TextStyle(fontSize: 11, color: AppConstants.skyBlue)),
-                        ),
-                        onTap: () async {
-                          setState(() => _selectedSound = entry.key);
-                          await NotificationService.instance.setSelectedSound(entry.key);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Notification sound set to ${entry.value}'),
-                                backgroundColor: AppConstants.statusSuccess,
-                                duration: const Duration(seconds: 2),
+                              ],
+                            ),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                minimumSize: const Size(60, 28),
+                                side: const BorderSide(color: AppConstants.skyBlue),
                               ),
-                            );
-                          }
-                        },
-                      ),
-                    );
-                  }),
+                              icon: const Icon(Icons.volume_up_rounded, color: AppConstants.skyBlue, size: 16),
+                              label: const Text('Test', style: TextStyle(fontSize: 11, color: AppConstants.skyBlue, fontWeight: FontWeight.w700)),
+                              onPressed: () async {
+                                // Play current sound directly without notification
+                                await NotificationService.instance.playSoundDirectly(_selectedSound);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Plays for all reminders, meetings, tasks & notices',
+                          style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                        ),
+                        const SizedBox(height: 10),
+                        InkWell(
+                          onTap: () => _showSoundPickerModal(context),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: AppConstants.pureWhite,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppConstants.borderSubtle),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    NotificationService.availableSounds[_selectedSound] ?? 'Reminder Chime (Default)',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppConstants.darkBlue,
+                                    ),
+                                  ),
+                                ),
+                                const Text(
+                                  'Change Sound',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppConstants.skyBlue,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.arrow_drop_down, color: AppConstants.skyBlue, size: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const Divider(height: 20, color: AppConstants.borderSubtle),
 
                   // 3. GitHub In-App Auto-Updater
