@@ -24,6 +24,8 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   Widget build(BuildContext context) {
     final quickAlerts = ref.watch(quickAlertsProvider);
     final activeAlertCount = quickAlerts.where((a) => a.status == 'active').length;
+    final dynamicConfig = ref.watch(dynamicAppConfigProvider);
+    final headerTag = dynamicConfig['header_tag']?.toString() ?? 'Live Cloud Synced';
 
     final List<Widget> tabs = [
       HomeScreen(onNavigateTab: (idx) => setState(() => _currentTabIndex = idx)),
@@ -73,9 +75,9 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Text(
-                      'Live Cloud Synced',
-                      style: TextStyle(
+                    Text(
+                      headerTag,
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: AppConstants.statusSuccess,

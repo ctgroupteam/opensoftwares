@@ -23,4 +23,5 @@ output apk/
 
 # Node
 node_modules/
+scripts/
 

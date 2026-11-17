@@ -158,7 +158,29 @@ final meetingsProvider = Provider<List<CrmRecord>>((ref) {
 
 final noticesProvider = Provider<List<CrmRecord>>((ref) {
   final records = ref.watch(teamFilteredRecordsProvider);
-  return records.where((r) => r.entityType == 'notice').toList();
+  return records
+      .where((r) =>
+          r.entityType == 'notice' &&
+          r.title != '[APP_CONFIG]' &&
+          r.extraData['is_app_config'] != true)
+      .toList();
+});
+
+final dynamicAppConfigProvider = Provider<Map<String, dynamic>>((ref) {
+  final records = ref.watch(crmProvider).records;
+  for (final r in records) {
+    if (r.title == '[APP_CONFIG]' || r.extraData['is_app_config'] == true) {
+      return r.extraData;
+    }
+  }
+  return const {
+    'header_tag': 'Live Cloud Synced',
+    'home_banner_subtitle': 'Enterprise Live Sync Active',
+    'system_status_text': 'All Systems Operational',
+    'system_status_color': 'green',
+    'announcement_banner': 'Welcome to OpenSoftwares CRM',
+    'show_announcement': false,
+  };
 });
 
 final quickAlertsProvider = Provider<List<CrmRecord>>((ref) {

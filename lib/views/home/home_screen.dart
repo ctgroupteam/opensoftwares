@@ -150,6 +150,12 @@ class HomeScreen extends ConsumerWidget {
     final collections = ref.watch(collectionsProvider);
     final activityLogs = ref.watch(activityLogsProvider);
     final userProfile = ref.watch(authProvider).profile;
+    final appConfig = ref.watch(dynamicAppConfigProvider);
+
+    // Dynamic Server-Driven Values from Supabase
+    final statusText = appConfig['system_status_text']?.toString() ?? 'Enterprise Live Sync Active';
+    final announcement = appConfig['announcement_banner']?.toString() ?? '';
+    final showAnnouncement = appConfig['show_announcement'] == true;
 
     // Filter calculations
     final pendingTasks = tasks.where((t) => t.status != 'done' && t.status != 'completed').length;
@@ -202,9 +208,9 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 5),
-                        const Text(
-                          'Enterprise Live Sync Active',
-                          style: TextStyle(
+                        Text(
+                          statusText,
+                          style: const TextStyle(
                             color: AppConstants.statusSuccess,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -230,6 +236,33 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            if (showAnnouncement && announcement.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppConstants.skyBlue.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppConstants.skyBlue.withOpacity(0.25)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.campaign_outlined, size: 18, color: AppConstants.darkBlue),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        announcement,
+                        style: const TextStyle(
+                          color: AppConstants.textBlack,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 18),
 
             // 4 Executive Metrics Cards Grid
