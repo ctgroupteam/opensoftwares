@@ -33,8 +33,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   Widget build(BuildContext context) {
     final quickAlerts = ref.watch(quickAlertsProvider);
     final activeAlertCount = quickAlerts.where((a) => a.status == 'active').length;
-    final dynamicConfig = ref.watch(dynamicAppConfigProvider);
-    final headerTag = dynamicConfig['header_tag']?.toString() ?? 'Live Cloud Synced';
 
     final List<Widget> tabs = [
       HomeScreen(onNavigateTab: (idx) => setState(() => _currentTabIndex = idx)),
@@ -67,42 +65,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
               ),
               child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'OpenSoftwares CRM',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: AppConstants.statusSuccess,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      headerTag,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppConstants.statusSuccess,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            const SizedBox(width: 10),
+            const Text(
+              'OpenSoftwares CRM',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+                color: AppConstants.textBlack,
+              ),
             ),
           ],
         ),

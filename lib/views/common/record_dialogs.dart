@@ -368,6 +368,15 @@ class _RecordDetailDialogState extends ConsumerState<RecordDetailDialog> {
             ref.read(crmProvider.notifier).deleteRecord(r.id);
           },
         ),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(backgroundColor: AppConstants.skyBlue),
+          icon: const Icon(Icons.edit, size: 16, color: Colors.white),
+          label: const Text('Edit Details', style: TextStyle(color: Colors.white)),
+          onPressed: () {
+            Navigator.pop(context);
+            showEditRecordDialog(context, ref, r);
+          },
+        ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
           onPressed: () => Navigator.pop(context),
@@ -417,6 +426,250 @@ void showRecordDetail(BuildContext context, CrmRecord record) {
   showDialog(
     context: context,
     builder: (_) => RecordDetailDialog(record: record),
+  );
+}
+
+void showEditRecordDialog(BuildContext context, WidgetRef ref, CrmRecord record) {
+  final titleCtrl = TextEditingController(text: record.title);
+  final descCtrl = TextEditingController(text: record.description ?? '');
+  final clientCtrl = TextEditingController(text: record.clientName ?? '');
+  final manualAssignedCtrl = TextEditingController();
+
+  String selectedFounder = kFounderNames.first;
+  final currentAssigned = record.assignedPerson?.trim();
+  if (currentAssigned != null && currentAssigned.isNotEmpty) {
+    if (kFounderNames.contains(currentAssigned)) {
+      selectedFounder = currentAssigned;
+    } else {
+      selectedFounder = 'Other (Enter Manually)';
+      manualAssignedCtrl.text = currentAssigned;
+    }
+  }
+
+  String status = record.status.toLowerCase().trim();
+  if (!kRecordStatuses.contains(status)) status = 'pending';
+
+  String priority = record.priority.toLowerCase().trim();
+  if (!['low', 'normal', 'high', 'urgent'].contains(priority)) priority = 'normal';
+
+  String team = record.team;
+  if (!['Gulbarga', 'Solapur', 'Both'].contains(team)) team = 'Gulbarga';
+
+  DateTime? deadline = record.dueDate;
+
+  showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        title: Text('Edit ${record.entityType.toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(labelText: 'Title *'),
+              ),
+              const SizedBox(height: 10),
+              if (record.entityType != 'task') ...[
+                TextField(
+                  controller: clientCtrl,
+                  decoration: const InputDecoration(labelText: 'Client / School / Agency Name'),
+                ),
+                const SizedBox(height: 10),
+              ],
+              TextField(
+                controller: descCtrl,
+                decoration: const InputDecoration(labelText: 'Description / Notes'),
+              ),
+              const SizedBox(height: 12),
+
+              // Assigned Person Dropdown
+              DropdownButtonFormField<String>(
+                value: selectedFounder,
+                decoration: const InputDecoration(labelText: 'Assigned Person'),
+                items: kFounderNames.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
+                onChanged: (v) => setDialogState(() => selectedFounder = v!),
+              ),
+              if (selectedFounder == 'Other (Enter Manually)') ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: manualAssignedCtrl,
+                  decoration: const InputDecoration(labelText: 'Enter Assignee Name *'),
+                ),
+              ],
+              const SizedBox(height: 10),
+
+              // Status Dropdown
+              DropdownButtonFormField<String>(
+                value: status,
+                decoration: const InputDecoration(labelText: 'Status'),
+                items: kRecordStatuses.map((st) {
+                  final color = getStatusColor(st);
+                  return DropdownMenuItem(
+                    value: st,
+                    child: Text(formatStatus(st), style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+                  );
+                }).toList(),
+                onChanged: (v) => setDialogState(() => status = v!),
+              ),
+              const SizedBox(height: 10),
+
+              // Deadline / Date Picker Button
+              InkWell(
+                onTap: () async {
+                  final now = DateTime.now();
+                  final pickedDate = await showDatePicker(
+                    context: ctx,
+                    initialDate: deadline ?? now.add(const Duration(days: 1)),
+                    firstDate: now.subtract(const Duration(days: 365)),
+                    lastDate: now.add(const Duration(days: 730)),
+                  );
+                  if (pickedDate != null && ctx.mounted) {
+                    final pickedTime = await showTimePicker(
+                      context: ctx,
+                      initialTime: TimeOfDay.fromDateTime(deadline ?? now.add(const Duration(hours: 4))),
+                    );
+                    if (pickedTime != null) {
+                      setDialogState(() {
+                        deadline = DateTime(
+                          pickedDate.year,
+                          pickedDate.month,
+                          pickedDate.day,
+                          pickedTime.hour,
+                          pickedTime.minute,
+                        );
+                      });
+                    }
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppConstants.borderSubtle),
+                    borderRadius: BorderRadius.circular(8),
+                    color: AppConstants.backgroundLight,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_month_outlined, size: 18, color: AppConstants.skyBlue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          deadline != null
+                              ? 'Deadline: ${DateFormat("dd MMM yyyy, hh:mm a").format(deadline!)}'
+                              : 'Set Deadline Date & Time',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: deadline != null ? FontWeight.w700 : FontWeight.w500,
+                            color: deadline != null ? AppConstants.textBlack : AppConstants.textMuted,
+                          ),
+                        ),
+                      ),
+                      if (deadline != null)
+                        GestureDetector(
+                          onTap: () => setDialogState(() => deadline = null),
+                          child: const Icon(Icons.clear, size: 16, color: AppConstants.textMuted),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Priority & Team
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: priority,
+                      decoration: const InputDecoration(labelText: 'Priority'),
+                      items: const [
+                        DropdownMenuItem(value: 'low', child: Text('Low')),
+                        DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                        DropdownMenuItem(value: 'high', child: Text('High')),
+                        DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
+                      ],
+                      onChanged: (v) => setDialogState(() => priority = v!),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: team,
+                      decoration: const InputDecoration(labelText: 'Team'),
+                      items: const [
+                        DropdownMenuItem(value: 'Gulbarga', child: Text('Gulbarga')),
+                        DropdownMenuItem(value: 'Solapur', child: Text('Solapur')),
+                        DropdownMenuItem(value: 'Both', child: Text('Both')),
+                      ],
+                      onChanged: (v) => setDialogState(() => team = v!),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
+            onPressed: () async {
+              if (titleCtrl.text.trim().isEmpty) return;
+              final assignedName = selectedFounder == 'Other (Enter Manually)'
+                  ? manualAssignedCtrl.text.trim()
+                  : selectedFounder;
+
+              final currentUser = ref.read(authProvider).profile;
+              final changerName = (currentUser != null && currentUser.name.trim().isNotEmpty)
+                  ? currentUser.name.trim()
+                  : 'Yahya Mundewadi';
+
+              final extra = Map<String, dynamic>.from(record.extraData);
+              extra['assigned_to'] = assignedName;
+              extra['status_changed_by'] = changerName;
+              extra['status_changed_at'] = DateTime.now().toIso8601String();
+              if (deadline != null) {
+                extra['deadline'] = deadline!.toIso8601String();
+              } else {
+                extra.remove('deadline');
+              }
+
+              Navigator.pop(ctx);
+
+              final updated = record.copyWith(
+                title: titleCtrl.text.trim(),
+                clientName: clientCtrl.text.trim().isNotEmpty ? clientCtrl.text.trim() : record.clientName,
+                description: descCtrl.text.trim(),
+                assignedTo: assignedName,
+                status: status,
+                priority: priority,
+                team: team,
+                dueDate: deadline,
+                extraData: extra,
+              );
+
+              await ref.read(crmProvider.notifier).updateRecord(updated);
+
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Updated successfully. Assigned to $assignedName'),
+                    backgroundColor: AppConstants.statusSuccess,
+                  ),
+                );
+              }
+            },
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    ),
   );
 }
 
