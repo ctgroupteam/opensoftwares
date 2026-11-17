@@ -6,8 +6,8 @@ class AppConstants {
   static const String developerAttribution = 'Yahya Mundewadi - yahya.in';
   static const String adminFixedNumber = '9307426215';
 
-  // GitHub Auto-Updater
-  static const String githubRepo = 'mdyahhya/opensoftwares_crm';
+  // GitHub Repository Reference
+  static const String githubRepo = 'ctgroupteam/opensoftwares';
 
   // Supabase Configuration
   static const String supabaseUrl = 'https://jjraluhoybumzpdikark.supabase.co';

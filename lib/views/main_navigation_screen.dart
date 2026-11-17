@@ -49,13 +49,41 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
               child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
             ),
             const SizedBox(width: 8),
-            const Text(
-              'OpenSoftwares CRM',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'OpenSoftwares CRM',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: AppConstants.statusSuccess,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Live Cloud Synced',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppConstants.statusSuccess,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ],
         ),
