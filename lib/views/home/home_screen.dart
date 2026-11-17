@@ -190,6 +190,28 @@ class HomeScreen extends ConsumerWidget {
                         letterSpacing: 0.5,
                       ),
                     ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppConstants.statusSuccess,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Text(
+                          'Enterprise Live Sync Active',
+                          style: TextStyle(
+                            color: AppConstants.statusSuccess,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
                 // Remind Button
