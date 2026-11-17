@@ -123,13 +123,15 @@ class RecordDetailDialog extends ConsumerStatefulWidget {
 }
 
 class _RecordDetailDialogState extends ConsumerState<RecordDetailDialog> {
+  late CrmRecord _record;
   late String _currentStatus;
   bool _isUpdating = false;
 
   @override
   void initState() {
     super.initState();
-    _currentStatus = widget.record.status.toLowerCase().trim();
+    _record = widget.record;
+    _currentStatus = _record.status.toLowerCase().trim();
     if (!kRecordStatuses.contains(_currentStatus)) {
       _currentStatus = 'pending';
     }
@@ -144,11 +146,11 @@ class _RecordDetailDialogState extends ConsumerState<RecordDetailDialog> {
         ? currentUser.name.trim()
         : 'Yahya Mundewadi';
 
-    final extra = Map<String, dynamic>.from(widget.record.extraData);
+    final extra = Map<String, dynamic>.from(_record.extraData);
     extra['status_changed_by'] = changerName;
     extra['status_changed_at'] = DateTime.now().toIso8601String();
 
-    final updated = widget.record.copyWith(
+    final updated = _record.copyWith(
       status: newStatus,
       extraData: extra,
     );
@@ -157,6 +159,7 @@ class _RecordDetailDialogState extends ConsumerState<RecordDetailDialog> {
 
     if (mounted) {
       setState(() {
+        _record = updated;
         _currentStatus = newStatus;
         _isUpdating = false;
       });
@@ -170,10 +173,107 @@ class _RecordDetailDialogState extends ConsumerState<RecordDetailDialog> {
     }
   }
 
+  void _showQuickAssignDialog(BuildContext context) {
+    String selected = kFounderNames.first;
+    final currentAssigned = _record.assignedPerson?.trim();
+    final manualCtrl = TextEditingController();
+
+    if (currentAssigned != null && currentAssigned.isNotEmpty) {
+      if (kFounderNames.contains(currentAssigned)) {
+        selected = currentAssigned;
+      } else {
+        selected = 'Other (Enter Manually)';
+        manualCtrl.text = currentAssigned;
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setQuickState) => AlertDialog(
+          title: const Text('Assign Person', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Choose founder or type manual name:', style: TextStyle(fontSize: 12, color: AppConstants.textMuted)),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selected,
+                decoration: const InputDecoration(labelText: 'Assigned Person'),
+                items: kFounderNames.map((n) => DropdownMenuItem(value: n, child: Text(n, style: const TextStyle(fontSize: 13)))).toList(),
+                onChanged: (v) => setQuickState(() => selected = v!),
+              ),
+              if (selected == 'Other (Enter Manually)') ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: manualCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Type Assignee Name *',
+                    hintText: 'Enter name',
+                    prefixIcon: Icon(Icons.person_outline, size: 18),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
+              onPressed: () async {
+                final chosen = selected == 'Other (Enter Manually)'
+                    ? manualCtrl.text.trim()
+                    : selected;
+                if (chosen.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter an assignee name')),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx);
+
+                final messenger = ScaffoldMessenger.of(context);
+                final currentUser = ref.read(authProvider).profile;
+                final changerName = (currentUser != null && currentUser.name.trim().isNotEmpty)
+                    ? currentUser.name.trim()
+                    : 'Yahya Mundewadi';
+
+                final extra = Map<String, dynamic>.from(_record.extraData);
+                extra['assigned_to'] = chosen;
+                extra['status_changed_by'] = changerName;
+                extra['status_changed_at'] = DateTime.now().toIso8601String();
+
+                final updated = _record.copyWith(
+                  assignedTo: chosen,
+                  extraData: extra,
+                );
+
+                await ref.read(crmProvider.notifier).updateRecord(updated);
+
+                if (mounted) {
+                  setState(() => _record = updated);
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Assigned to $chosen successfully'),
+                      backgroundColor: AppConstants.statusSuccess,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Save Assignment'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final r = widget.record;
-    final assigned = r.assignedPerson ?? 'Unassigned';
+    final r = _record;
+    final assigned = r.assignedPerson ?? 'Unassigned (Tap to assign)';
     final changedBy = r.statusChangedBy;
     final changedAt = r.statusChangedAt != null
         ? DateFormat('dd MMM, hh:mm a').format(DateTime.tryParse(r.statusChangedAt!)?.toLocal() ?? DateTime.now())
@@ -307,11 +407,50 @@ class _RecordDetailDialogState extends ConsumerState<RecordDetailDialog> {
             const Divider(color: AppConstants.borderSubtle),
             const SizedBox(height: 8),
 
-            // Assigned Person
-            _buildInfoRow(
-              Icons.account_circle_outlined,
-              'Assigned Person',
-              assigned,
+            // Assigned Person (Directly clickable to assign or change)
+            InkWell(
+              onTap: () => _showQuickAssignDialog(context),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppConstants.skyBlue.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppConstants.skyBlue.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.account_circle, size: 20, color: AppConstants.skyBlue),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'ASSIGNED PERSON (TAP TO CHANGE)',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: AppConstants.skyBlue,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            assigned,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppConstants.textBlack,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.edit_outlined, size: 16, color: AppConstants.skyBlue),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 10),
 
@@ -496,7 +635,12 @@ void showEditRecordDialog(BuildContext context, WidgetRef ref, CrmRecord record)
                 const SizedBox(height: 10),
                 TextField(
                   controller: manualAssignedCtrl,
-                  decoration: const InputDecoration(labelText: 'Enter Assignee Name *'),
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Type Assignee Name *',
+                    hintText: 'Enter name',
+                    prefixIcon: Icon(Icons.person_outline, size: 18),
+                  ),
                 ),
               ],
               const SizedBox(height: 10),
@@ -620,10 +764,22 @@ void showEditRecordDialog(BuildContext context, WidgetRef ref, CrmRecord record)
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
             onPressed: () async {
-              if (titleCtrl.text.trim().isEmpty) return;
+              if (titleCtrl.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a title')),
+                );
+                return;
+              }
               final assignedName = selectedFounder == 'Other (Enter Manually)'
                   ? manualAssignedCtrl.text.trim()
                   : selectedFounder;
+
+              if (selectedFounder == 'Other (Enter Manually)' && assignedName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter the assignee name')),
+                );
+                return;
+              }
 
               final currentUser = ref.read(authProvider).profile;
               final changerName = (currentUser != null && currentUser.name.trim().isNotEmpty)

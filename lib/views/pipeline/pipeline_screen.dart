@@ -736,7 +736,12 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                   const SizedBox(height: 10),
                   TextField(
                     controller: manualAssignedCtrl,
-                    decoration: const InputDecoration(labelText: 'Enter Assignee Name *'),
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Type Assignee Name *',
+                      hintText: 'Enter name',
+                      prefixIcon: Icon(Icons.person_outline, size: 18),
+                    ),
                   ),
                 ],
                 const SizedBox(height: 10),
@@ -775,10 +780,22 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
               onPressed: () {
-                if (titleCtrl.text.trim().isEmpty) return;
+                if (titleCtrl.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter an item title')),
+                  );
+                  return;
+                }
                 final assignedName = selectedFounder == 'Other (Enter Manually)'
                     ? manualAssignedCtrl.text.trim()
                     : selectedFounder;
+
+                if (selectedFounder == 'Other (Enter Manually)' && assignedName.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter the assignee name')),
+                  );
+                  return;
+                }
 
                 final currentUser = ref.read(authProvider).profile;
                 final creatorName = (currentUser != null && currentUser.name.trim().isNotEmpty)
@@ -948,7 +965,12 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                   const SizedBox(height: 10),
                   TextField(
                     controller: manualAssignedCtrl,
-                    decoration: const InputDecoration(labelText: 'Enter Assignee Name *'),
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Type Assignee Name *',
+                      hintText: 'Enter name',
+                      prefixIcon: Icon(Icons.person_outline, size: 18),
+                    ),
                   ),
                 ],
                 const SizedBox(height: 10),
@@ -1027,10 +1049,22 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
               onPressed: () {
-                if (clientCtrl.text.trim().isEmpty) return;
+                if (clientCtrl.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter client or school name')),
+                  );
+                  return;
+                }
                 final assignedName = selectedFounder == 'Other (Enter Manually)'
                     ? manualAssignedCtrl.text.trim()
                     : selectedFounder;
+
+                if (selectedFounder == 'Other (Enter Manually)' && assignedName.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter the assignee name')),
+                  );
+                  return;
+                }
 
                 final currentUser = ref.read(authProvider).profile;
                 final creatorName = (currentUser != null && currentUser.name.trim().isNotEmpty)

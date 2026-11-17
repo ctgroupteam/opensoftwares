@@ -44,7 +44,16 @@ class CrmRecord {
   // Helper getters
   String? get statusChangedBy => extraData['status_changed_by'] as String?;
   String? get statusChangedAt => extraData['status_changed_at'] as String?;
-  String? get assignedPerson => assignedTo ?? (extraData['assigned_to'] as String?);
+  String? get assignedPerson {
+    if (assignedTo != null && assignedTo!.trim().isNotEmpty) {
+      return assignedTo!.trim();
+    }
+    final extra = extraData['assigned_to']?.toString().trim();
+    if (extra != null && extra.isNotEmpty) {
+      return extra;
+    }
+    return null;
+  }
   String? get pipelineSection => extraData['pipeline_section'] as String?;
   String get leadStage => extraData['stage'] as String? ?? 'New';
   String get pitchNotes => extraData['pitch_notes'] as String? ?? '';
