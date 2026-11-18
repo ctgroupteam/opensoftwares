@@ -42,17 +42,29 @@ class CrmRecord {
   });
 
   // Helper getters
+  static final RegExp _uuidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  static bool isUuid(String? str) {
+    if (str == null) return false;
+    return _uuidRegex.hasMatch(str.trim());
+  }
+
   String? get statusChangedBy => extraData['status_changed_by'] as String?;
   String? get statusChangedAt => extraData['status_changed_at'] as String?;
   String? get assignedPerson {
-    if (assignedTo != null && assignedTo!.trim().isNotEmpty) {
+    final extra = (extraData['assigned_name'] ?? extraData['assigned_to'])?.toString().trim();
+    if (extra != null && extra.isNotEmpty && !isUuid(extra)) {
+      return extra;
+    }
+    if (assignedTo != null && assignedTo!.trim().isNotEmpty && !isUuid(assignedTo)) {
       return assignedTo!.trim();
     }
-    final extra = extraData['assigned_to']?.toString().trim();
     if (extra != null && extra.isNotEmpty) {
       return extra;
     }
-    return null;
+    return assignedTo;
   }
   String? get pipelineSection => extraData['pipeline_section'] as String?;
   String get leadStage => extraData['stage'] as String? ?? 'New';
@@ -112,6 +124,13 @@ class CrmRecord {
   }
 
   Map<String, dynamic> toJson() {
+    final validUuid = isUuid(assignedTo) ? assignedTo!.trim() : null;
+    final cleanExtra = Map<String, dynamic>.from(extraData);
+    if (assignedTo != null && assignedTo!.trim().isNotEmpty && !isUuid(assignedTo)) {
+      cleanExtra['assigned_to'] = assignedTo!.trim();
+      cleanExtra['assigned_name'] = assignedTo!.trim();
+    }
+
     return {
       'id': id,
       'entity_type': entityType,
@@ -120,16 +139,16 @@ class CrmRecord {
       'team': team,
       'status': status,
       'priority': priority,
-      'assigned_to': assignedTo,
-      'partner_id': partnerId,
-      'product_id': productId,
+      'assigned_to': validUuid,
+      'partner_id': isUuid(partnerId) ? partnerId : null,
+      'product_id': isUuid(productId) ? productId : null,
       'client_name': clientName,
       'amount_due': amountDue,
       'amount_received': amountReceived,
       'due_date': dueDate?.toIso8601String(),
       'meeting_time': meetingTime?.toIso8601String(),
-      'extra_data': extraData,
-      'created_by': createdBy,
+      'extra_data': cleanExtra,
+      'created_by': isUuid(createdBy) ? createdBy : null,
     };
   }
 

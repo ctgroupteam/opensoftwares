@@ -7,10 +7,10 @@ import '../../providers/auth_provider.dart';
 import '../../providers/crm_provider.dart';
 
 const List<String> kFounderNames = [
-  'Yahya Mundewadi (Admin Founder)',
-  'Founder 2',
-  'Founder 3',
-  'Founder 4',
+  'Yahya Mundewadi',
+  'Shoaib Maindargi',
+  'Zubair Ahmed',
+  'Sulaiman Sikandar',
   'Other (Enter Manually)',
 ];
 
@@ -174,12 +174,13 @@ class _RecordDetailDialogState extends ConsumerState<RecordDetailDialog> {
   }
 
   void _showQuickAssignDialog(BuildContext context) {
-    String selected = kFounderNames.first;
+    final assigneeList = ref.read(assigneeOptionsProvider);
+    String selected = assigneeList.first;
     final currentAssigned = _record.assignedPerson?.trim();
     final manualCtrl = TextEditingController();
 
     if (currentAssigned != null && currentAssigned.isNotEmpty) {
-      if (kFounderNames.contains(currentAssigned)) {
+      if (assigneeList.contains(currentAssigned)) {
         selected = currentAssigned;
       } else {
         selected = 'Other (Enter Manually)';
@@ -201,7 +202,7 @@ class _RecordDetailDialogState extends ConsumerState<RecordDetailDialog> {
               DropdownButtonFormField<String>(
                 value: selected,
                 decoration: const InputDecoration(labelText: 'Assigned Person'),
-                items: kFounderNames.map((n) => DropdownMenuItem(value: n, child: Text(n, style: const TextStyle(fontSize: 13)))).toList(),
+                items: assigneeList.map((n) => DropdownMenuItem(value: n, child: Text(n, style: const TextStyle(fontSize: 13)))).toList(),
                 onChanged: (v) => setQuickState(() => selected = v!),
               ),
               if (selected == 'Other (Enter Manually)') ...[
@@ -242,11 +243,16 @@ class _RecordDetailDialogState extends ConsumerState<RecordDetailDialog> {
 
                 final extra = Map<String, dynamic>.from(_record.extraData);
                 extra['assigned_to'] = chosen;
+                extra['assigned_name'] = chosen;
                 extra['status_changed_by'] = changerName;
                 extra['status_changed_at'] = DateTime.now().toIso8601String();
 
+                final profiles = ref.read(profilesProvider);
+                final match = profiles.where((p) => p.name.trim().toLowerCase() == chosen.toLowerCase()).firstOrNull;
+                final profileUuid = match?.id;
+
                 final updated = _record.copyWith(
-                  assignedTo: chosen,
+                  assignedTo: profileUuid,
                   extraData: extra,
                 );
 
@@ -574,10 +580,11 @@ void showEditRecordDialog(BuildContext context, WidgetRef ref, CrmRecord record)
   final clientCtrl = TextEditingController(text: record.clientName ?? '');
   final manualAssignedCtrl = TextEditingController();
 
-  String selectedFounder = kFounderNames.first;
+  final assigneeList = ref.read(assigneeOptionsProvider);
+  String selectedFounder = assigneeList.first;
   final currentAssigned = record.assignedPerson?.trim();
   if (currentAssigned != null && currentAssigned.isNotEmpty) {
-    if (kFounderNames.contains(currentAssigned)) {
+    if (assigneeList.contains(currentAssigned)) {
       selectedFounder = currentAssigned;
     } else {
       selectedFounder = 'Other (Enter Manually)';
@@ -628,7 +635,7 @@ void showEditRecordDialog(BuildContext context, WidgetRef ref, CrmRecord record)
               DropdownButtonFormField<String>(
                 value: selectedFounder,
                 decoration: const InputDecoration(labelText: 'Assigned Person'),
-                items: kFounderNames.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
+                items: assigneeList.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
                 onChanged: (v) => setDialogState(() => selectedFounder = v!),
               ),
               if (selectedFounder == 'Other (Enter Manually)') ...[
@@ -788,6 +795,7 @@ void showEditRecordDialog(BuildContext context, WidgetRef ref, CrmRecord record)
 
               final extra = Map<String, dynamic>.from(record.extraData);
               extra['assigned_to'] = assignedName;
+              extra['assigned_name'] = assignedName;
               extra['status_changed_by'] = changerName;
               extra['status_changed_at'] = DateTime.now().toIso8601String();
               if (deadline != null) {
@@ -796,13 +804,17 @@ void showEditRecordDialog(BuildContext context, WidgetRef ref, CrmRecord record)
                 extra.remove('deadline');
               }
 
+              final profiles = ref.read(profilesProvider);
+              final match = profiles.where((p) => p.name.trim().toLowerCase() == assignedName.toLowerCase()).firstOrNull;
+              final profileUuid = match?.id;
+
               Navigator.pop(ctx);
 
               final updated = record.copyWith(
                 title: titleCtrl.text.trim(),
                 clientName: clientCtrl.text.trim().isNotEmpty ? clientCtrl.text.trim() : record.clientName,
                 description: descCtrl.text.trim(),
-                assignedTo: assignedName,
+                assignedTo: profileUuid,
                 status: status,
                 priority: priority,
                 team: team,

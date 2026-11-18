@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/crm_profile.dart';
 import '../models/crm_record.dart';
 import '../services/offline_cache_service.dart';
 import '../services/supabase_service.dart';
@@ -205,5 +206,44 @@ final quickAlertsProvider = Provider<List<CrmRecord>>((ref) {
 final activityLogsProvider = Provider<List<CrmRecord>>((ref) {
   final records = ref.watch(crmProvider).records;
   return records.where((r) => r.entityType == 'activity_log').toList();
+});
+
+class ProfilesNotifier extends StateNotifier<List<CrmProfile>> {
+  ProfilesNotifier() : super([]) {
+    loadProfiles();
+  }
+
+  Future<void> loadProfiles() async {
+    try {
+      final profiles = await SupabaseService.instance.getAllProfiles();
+      if (mounted) state = profiles;
+    } catch (_) {}
+  }
+}
+
+final profilesProvider =
+    StateNotifierProvider<ProfilesNotifier, List<CrmProfile>>((ref) {
+  return ProfilesNotifier();
+});
+
+final assigneeOptionsProvider = Provider<List<String>>((ref) {
+  final profiles = ref.watch(profilesProvider);
+  final names = <String>[];
+  for (final p in profiles) {
+    final name = p.name.trim();
+    if (name.isNotEmpty && !names.contains(name)) {
+      names.add(name);
+    }
+  }
+  if (names.isEmpty) {
+    names.addAll([
+      'Yahya Mundewadi',
+      'Shoaib Maindargi',
+      'Zubair Ahmed',
+      'Sulaiman Sikandar',
+    ]);
+  }
+  names.add('Other (Enter Manually)');
+  return names;
 });
 

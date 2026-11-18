@@ -217,6 +217,22 @@ class HomeScreen extends ConsumerWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: AppConstants.darkBlue.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'v${AppConstants.appVersion}',
+                            style: TextStyle(
+                              color: AppConstants.darkBlue,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -636,7 +652,8 @@ class HomeScreen extends ConsumerWidget {
     String priority = 'normal';
     String team = 'Gulbarga';
     String status = 'pending';
-    String selectedFounder = kFounderNames.first;
+    final assigneeList = ref.read(assigneeOptionsProvider);
+    String selectedFounder = assigneeList.first;
     DateTime? deadline;
 
     showDialog(
@@ -664,7 +681,7 @@ class HomeScreen extends ConsumerWidget {
                 DropdownButtonFormField<String>(
                   value: selectedFounder,
                   decoration: const InputDecoration(labelText: 'Assigned Person'),
-                  items: kFounderNames.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
+                  items: assigneeList.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
                   onChanged: (v) => setDialogState(() => selectedFounder = v!),
                 ),
                 if (selectedFounder == 'Other (Enter Manually)') ...[
@@ -822,6 +839,11 @@ class HomeScreen extends ConsumerWidget {
                     ? currentUser.name.trim()
                     : 'Yahya Mundewadi';
 
+                final match = ref.read(profilesProvider)
+                    .where((p) => p.name.trim().toLowerCase() == assignedName.toLowerCase())
+                    .firstOrNull;
+                final profileUuid = match?.id;
+
                 Navigator.pop(ctx);
                 final task = CrmRecord(
                   id: '',
@@ -831,10 +853,11 @@ class HomeScreen extends ConsumerWidget {
                   priority: priority,
                   team: team,
                   status: status,
-                  assignedTo: assignedName,
+                  assignedTo: profileUuid,
                   dueDate: deadline,
                   extraData: {
                     'assigned_to': assignedName,
+                    'assigned_name': assignedName,
                     'status_changed_by': creatorName,
                     'status_changed_at': DateTime.now().toIso8601String(),
                     if (deadline != null) 'deadline': deadline!.toIso8601String(),

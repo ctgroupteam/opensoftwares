@@ -576,7 +576,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Enterprise Build v1.0.0',
+                  'Enterprise Build v${AppConstants.appVersion}',
                   style: TextStyle(color: AppConstants.textMuted, fontSize: 10),
                 ),
               ],

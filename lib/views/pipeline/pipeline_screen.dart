@@ -703,7 +703,8 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
     final clientCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
     final manualAssignedCtrl = TextEditingController();
-    String selectedFounder = kFounderNames.first;
+    final assigneeList = ref.read(assigneeOptionsProvider);
+    String selectedFounder = assigneeList.first;
     String status = 'pending';
     String team = 'Gulbarga';
     DateTime? dueDate = DateTime.now().add(const Duration(days: 3));
@@ -729,7 +730,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                 DropdownButtonFormField<String>(
                   value: selectedFounder,
                   decoration: const InputDecoration(labelText: 'Assigned Person'),
-                  items: kFounderNames.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
+                  items: assigneeList.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
                   onChanged: (v) => setDialogState(() => selectedFounder = v!),
                 ),
                 if (selectedFounder == 'Other (Enter Manually)') ...[
@@ -802,6 +803,11 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                     ? currentUser.name.trim()
                     : 'Yahya Mundewadi';
 
+                final match = ref.read(profilesProvider)
+                    .where((p) => p.name.trim().toLowerCase() == assignedName.toLowerCase())
+                    .firstOrNull;
+                final profileUuid = match?.id;
+
                 Navigator.pop(ctx);
                 final rec = CrmRecord(
                   id: '',
@@ -811,11 +817,12 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                   description: notesCtrl.text.trim(),
                   team: team,
                   status: status,
-                  assignedTo: assignedName,
+                  assignedTo: profileUuid,
                   dueDate: dueDate,
                   extraData: {
                     'pipeline_section': sectionName,
                     'assigned_to': assignedName,
+                    'assigned_name': assignedName,
                     'status_changed_by': creatorName,
                     'status_changed_at': DateTime.now().toIso8601String(),
                   },
@@ -935,7 +942,8 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
     final clientCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
     final manualAssignedCtrl = TextEditingController();
-    String selectedFounder = kFounderNames.first;
+    final assigneeList = ref.read(assigneeOptionsProvider);
+    String selectedFounder = assigneeList.first;
     String status = 'pending';
     DateTime? dueDate = DateTime.now().add(const Duration(days: 2));
 
@@ -958,7 +966,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                 DropdownButtonFormField<String>(
                   value: selectedFounder,
                   decoration: const InputDecoration(labelText: 'Assigned Person'),
-                  items: kFounderNames.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
+                  items: assigneeList.map((name) => DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 13)))).toList(),
                   onChanged: (v) => setDialogState(() => selectedFounder = v!),
                 ),
                 if (selectedFounder == 'Other (Enter Manually)') ...[
@@ -1071,6 +1079,11 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                     ? currentUser.name.trim()
                     : 'Yahya Mundewadi';
 
+                final match = ref.read(profilesProvider)
+                    .where((p) => p.name.trim().toLowerCase() == assignedName.toLowerCase())
+                    .firstOrNull;
+                final profileUuid = match?.id;
+
                 Navigator.pop(ctx);
                 final rec = CrmRecord(
                   id: '',
@@ -1080,9 +1093,10 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen>
                   description: notesCtrl.text.trim(),
                   dueDate: dueDate,
                   status: status,
-                  assignedTo: assignedName,
+                  assignedTo: profileUuid,
                   extraData: {
                     'assigned_to': assignedName,
+                    'assigned_name': assignedName,
                     'status_changed_by': creatorName,
                     'status_changed_at': DateTime.now().toIso8601String(),
                   },
