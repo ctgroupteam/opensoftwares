@@ -172,11 +172,49 @@ class UpdateService {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppConstants.darkBlue),
             onPressed: () async {
+              if (downloadUrl == null || downloadUrl.trim().isEmpty) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Download link is not available.')),
+                  );
+                }
+                Navigator.pop(ctx);
+                return;
+              }
+
+              final cleanUrl = downloadUrl.trim();
+              final uri = Uri.parse(cleanUrl);
+
               Navigator.pop(ctx);
-              if (downloadUrl != null) {
-                final uri = Uri.parse(downloadUrl);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Opening browser to download update... Please install once downloaded.'),
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+              }
+
+              try {
+                final launched = await launchUrl(
+                  uri,
+                  mode: LaunchMode.externalApplication,
+                );
+                if (!launched) {
+                  await launchUrl(uri, mode: LaunchMode.platformDefault);
+                }
+              } catch (e) {
+                try {
+                  await launchUrl(uri, mode: LaunchMode.platformDefault);
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Download link: $cleanUrl'),
+                        duration: const Duration(seconds: 10),
+                      ),
+                    );
+                  }
                 }
               }
             },

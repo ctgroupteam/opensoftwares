@@ -457,7 +457,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ),
                     subtitle: const Text(
-                      'Direct cloud updates via GitHub repository without rebuilding APK',
+                      'Check and download the latest release from GitHub',
                       style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
                     ),
                     trailing: Container(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppConstants {
   static const String appName = 'OpenSoftwares CRM';
-  static const String appVersion = '1.0.5';
+  static const String appVersion = '1.0.6';
   static const String developerAttribution = 'Yahya Mundewadi - yahya.in';
   static const String adminFixedNumber = '9307426215';
 
